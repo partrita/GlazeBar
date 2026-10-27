@@ -1,15 +1,13 @@
-GlazeBar + GlazeWM 커뮤니티 번들 0.1.0-preview.6
+GlazeBar + GlazeWM 커뮤니티 번들 0.1.0-preview.7
 
 Windows 11 x64 / ARM64용입니다. PC 아키텍처에 맞는 패키지를 사용하세요.
-GlazeBar와 수정 GlazeWM 3.10.1-glazebar.1이 포함됩니다.
+GlazeBar와 수정 GlazeWM 3.10.1-glazebar.2가 포함됩니다.
 GlazeWM 공식 배포판이 아닌 독립적인 커뮤니티 번들입니다.
 
 최신 변경
-주석이 본문과 같은 색으로 바뀌던 팔레트 보정을 수정했습니다.
-주석 색조를 유지하면서 배경 대비를 확보하고 이전 팔레트 캐시를 재생성합니다.
-업데이트 후 배경화면/테마를 다시 선택하고 VS Code에 적용하세요.
-Wallhaven 검색 필터·페이지 이동·즐겨찾기·미리보기 캐시·하트 보관함과
-배치를 보존하는 Alt+M 최소화·복원도 포함됩니다.
+창을 옮길 때 GlazeWM이 "No workspace is currently focused."
+"Focused container has no monitor." 오류를 반복하던 문제를 수정했습니다.
+빈 분할 정리는 화면을 다시 그리기 직전에 수행합니다.
 
 설치 및 업데이트
 1. ZIP 전체를 압축 해제합니다.
@@ -42,9 +40,7 @@ Win+Ctrl+Alt+Space: 배경화면 선택
 Alt+Shift+E: GlazeWM 종료
 
 지원 범위
-x64는 실제 Windows에서 검사합니다. ARM64는 교차 빌드 및 패키지 검사이며
-이번 버전의 실제 ARM64 기기 실행은 검증하지 않았습니다.
-새 Windows의 MSI/UAC 전체 설치 검증은 별도입니다. 코드 서명은 없습니다.
+ARM64 패키지는 x64에서 교차 빌드했습니다. 코드 서명은 없습니다.
 밝기는 모니터별 WMI 지원 여부에 따라 활성화되며 외부 모니터 DDC/CI는 포함하지 않습니다.
 날씨 기본 지역은 서울입니다. Open-Meteo 무료 API는 비상업용 조건이 적용됩니다.
 

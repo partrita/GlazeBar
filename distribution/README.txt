@@ -1,15 +1,13 @@
-GlazeBar + GlazeWM community bundle 0.1.0-preview.6
+GlazeBar + GlazeWM community bundle 0.1.0-preview.7
 
 For Windows 11 x64 / ARM64. Choose the package matching your Windows architecture.
-Includes native Rust GlazeBar and modified GlazeWM 3.10.1-glazebar.1.
+Includes native Rust GlazeBar and modified GlazeWM 3.10.1-glazebar.2.
 This is an independent community bundle, not an official GlazeWM release.
 
 Current changes
-Comment colors retain their muted hue while meeting the background contrast
-threshold, instead of becoming identical to body text. Old palette caches are
-regenerated. After updating, select your wallpaper/theme again and apply it to VS Code.
-Also includes Wallhaven search filters, pagination, saved searches, persistent
-previews and collections, plus layout-preserving Alt+M minimize/restore.
+Fixes the repeated "No workspace is currently focused." and "Focused container has no
+monitor." errors in GlazeWM after moving windows. Empty-split cleanup now runs just
+before redraw.
 
 Install / update
 1. Extract the entire ZIP.
@@ -42,10 +40,8 @@ Win+Alt+Shift+B: show/hide bar
 Win+Ctrl+Alt+Space: wallpaper picker
 Alt+Shift+E: quit GlazeWM
 
-Validation / limitations
-x64 is checked on Windows. ARM64 is cross-built and package-checked; this version
-has not been run on physical ARM64 hardware. Full MSI/UAC installation on a clean
-Windows system is separate. Binaries are not code-signed.
+Notes
+The ARM64 package is cross-built on x64. Binaries are not code-signed.
 Brightness controls depend on per-monitor WMI support; external DDC/CI is not included.
 Weather defaults to Seoul, using Open-Meteo's free non-commercial service:
 https://open-meteo.com/en/terms
