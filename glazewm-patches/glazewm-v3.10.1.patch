@@ -137,20 +137,92 @@ index 0b68158..4c3ab75 100644
      .map(|part| part.parse().unwrap_or(0))
      .collect::<Vec<u16>>();
 diff --git a/packages/wm/src/commands/container/detach_container.rs b/packages/wm/src/commands/container/detach_container.rs
-index 5c173c7..e4e7791 100644
+index 5c173c7..bb0b185 100644
 --- a/packages/wm/src/commands/container/detach_container.rs
 +++ b/packages/wm/src/commands/container/detach_container.rs
-@@ -55,5 +55,10 @@ pub fn detach_container(child_to_remove: Container) -> anyhow::Result<()> {
+@@ -55,5 +55,82 @@ pub fn detach_container(child_to_remove: Container) -> anyhow::Result<()> {
      }
    }
  
-+  // Removing the last window can also empty a chain of ancestor splits.
-+  // The one-level flatten above does not remove those grandparents.
-+  if parent.is_split() && !parent.has_children() {
-+    detach_container(parent)?;
-+  }
++  // Empty ancestor splits are intentionally left attached. Callers such as
++  // `move_container_within_tree` re-attach into an ancestor after detaching,
++  // and detaching it here would orphan the moved container. Leftover empty
++  // splits are pruned during platform sync instead.
    Ok(())
  }
++
++#[cfg(all(test, target_os = "windows"))]
++mod tests {
++  use wm_common::{GapsConfig, TilingDirection};
++  use wm_platform::{NativeWindow, NativeWindowWindowsExt, Rect, RectDelta};
++
++  use super::*;
++  use crate::models::{NativeWindowProperties, SplitContainer, TilingWindow};
++
++  fn split() -> Container {
++    SplitContainer::new(TilingDirection::Horizontal, GapsConfig::default())
++      .into()
++  }
++
++  fn window() -> Container {
++    let rect = Rect::from_ltrb(0, 0, 800, 600);
++
++    TilingWindow::new(
++      None,
++      NativeWindow::from_handle(0),
++      NativeWindowProperties {
++        title: String::new(),
++        class_name: String::new(),
++        process_name: String::new(),
++        frame: rect.clone(),
++        is_minimized: false,
++        is_maximized: false,
++        is_resizable: true,
++        shadow_borders: RectDelta::zero(),
++      },
++      None,
++      RectDelta::zero(),
++      rect,
++      false,
++      GapsConfig::default(),
++      Vec::new(),
++      None,
++    )
++    .into()
++  }
++
++  fn attach(parent: &Container, child: Container) {
++    *child.borrow_parent_mut() = Some(parent.clone());
++    parent.borrow_child_focus_order_mut().push_back(child.id());
++    parent.borrow_children_mut().push_back(child);
++  }
++
++  /// Detaching the only window in `G[P[W]]` must keep `G` attached, since
++  /// callers re-attach the window into `G` when moving it to an ancestor.
++  #[test]
++  fn detach_keeps_emptied_ancestor_split_attached() {
++    let root = split();
++    let sibling = window();
++    let ancestor = split();
++    let parent = split();
++    let moved = window();
++
++    attach(&root, sibling);
++    attach(&root, ancestor.clone());
++    attach(&ancestor, parent.clone());
++    attach(&parent, moved.clone());
++
++    detach_container(moved.clone()).unwrap();
++
++    assert!(moved.parent().is_none());
++    assert_eq!(ancestor.parent(), Some(root.clone()));
++    assert_eq!(root.child_count(), 2);
++
++    // Re-attaching into the ancestor leaves the window reachable from root.
++    attach(&ancestor, moved.clone());
++    assert!(moved.ancestors().any(|c| c == root));
++  }
++}
 diff --git a/packages/wm/src/commands/general/minimize_group.rs b/packages/wm/src/commands/general/minimize_group.rs
 new file mode 100644
 index 0000000..1dead85
@@ -428,14 +500,22 @@ index 30cf629..1475be0 100644
  pub use enable_binding_mode::*;
  pub use platform_sync::*;
 diff --git a/packages/wm/src/commands/general/platform_sync.rs b/packages/wm/src/commands/general/platform_sync.rs
-index 6f4a9da..5d8e302 100644
+index 6f4a9da..ab1ea20 100644
 --- a/packages/wm/src/commands/general/platform_sync.rs
 +++ b/packages/wm/src/commands/general/platform_sync.rs
-@@ -22,10 +22,12 @@ pub fn platform_sync(
+@@ -22,10 +22,20 @@ pub fn platform_sync(
    state: &mut WmState,
    config: &UserConfig,
  ) -> anyhow::Result<()> {
 +  state.group_restore_pending.retain(|_, started| started.elapsed() < std::time::Duration::from_secs(2));
++
++  // Drop empty split containers left behind by earlier tree operations. This
++  // runs here rather than in `detach_container`, since no caller is holding a
++  // reference to a split that it is about to re-attach into.
++  if !state.pending_sync.containers_to_redraw().is_empty() {
++    super::prune_empty_splits(&state.root_container.clone().into());
++  }
++
    let focused_container =
      state.focused_container().context("No focused container.")?;
  
@@ -445,7 +525,7 @@ index 6f4a9da..5d8e302 100644
      sync_focus(&focused_container, state)?;
    }
  
-@@ -35,6 +37,10 @@ pub fn platform_sync(
+@@ -35,6 +45,10 @@ pub fn platform_sync(
      redraw_containers(&focused_container, state, config)?;
    }
  
@@ -456,7 +536,7 @@ index 6f4a9da..5d8e302 100644
    if state.pending_sync.needs_cursor_jump()
      && config.value.general.cursor_jump.enabled
    {
-@@ -103,6 +109,16 @@ fn sync_focus(
+@@ -103,6 +117,16 @@ fn sync_focus(
      tracing::warn!("Failed to set focus: {}", err);
    }
  
@@ -473,7 +553,7 @@ index 6f4a9da..5d8e302 100644
    state.emit_event(WmEvent::FocusChanged {
      focused_container: focused_container.to_dto()?,
    });
-@@ -286,7 +302,8 @@ fn redraw_containers(
+@@ -286,7 +310,8 @@ fn redraw_containers(
      );
  
      if let Err(err) =
@@ -483,7 +563,7 @@ index 6f4a9da..5d8e302 100644
      {
        tracing::warn!("Failed to set window position: {}", err);
      }
-@@ -342,6 +359,7 @@ fn reposition_window(
+@@ -342,6 +367,7 @@ fn reposition_window(
    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
    z_order: &WindowZOrder,
    is_visible: bool,
@@ -491,7 +571,7 @@ index 6f4a9da..5d8e302 100644
    config: &UserConfig,
  ) -> anyhow::Result<()> {
    let rect = window
-@@ -415,10 +433,15 @@ fn reposition_window(
+@@ -415,10 +441,15 @@ fn reposition_window(
          }
        };
  
@@ -509,7 +589,7 @@ index 6f4a9da..5d8e302 100644
        }
  
        let mut swp_flags = SWP_NOACTIVATE
-@@ -443,8 +466,9 @@ fn reposition_window(
+@@ -443,8 +474,9 @@ fn reposition_window(
            window.native().set_window_pos(z_order, &rect, swp_flags)?;
          }
          _ => {

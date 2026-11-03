@@ -1,6 +1,6 @@
 # GlazeBar + GlazeWM
 
-> **preview.4 x64 / ARM64: 수정 GlazeWM 포함.** [원본 GlazeWM](https://github.com/glzr-io/glazewm) v3.10.1을 수정해 Alt+M의 실제 최소화·배치 보존 복원, 빈 분할 정리와 포커스 처리를 개선했습니다. ARM64에도 동일한 수정본을 포함합니다. ARM64는 교차 빌드했으며 실제 장치 검증은 별도입니다. 한영 입력 증상은 사용자가 기존 Codex 세션에 한정된 것으로 확인했으며, 이번 배포를 IME 수정으로 주장하지 않습니다. [변경 내역과 검증](docs/glazewm-modifications.md).
+> **최신: 0.1.0-preview.7 · Windows 11 x64 / ARM64.** 창을 옮길 때 `No workspace is currently focused.`, `Focused container has no monitor.` 오류가 반복되던 GlazeWM 문제를 고쳤습니다. preview.4~6 사용자는 업데이트를 권장합니다. [원인과 수정](docs/glazewm-modifications.md#preview7-fix)
 
 [한국어](README.md) · [English](README.en.md)
 
@@ -8,7 +8,7 @@
 
 Omarchy를 보고 Windows에서도 이런 환경을 써보고 싶어 GlazeWM을 사용하게 됐습니다. 그런데 함께 쓰던 Zebar가 WebView2 기반이라 제 환경에서는 꽤 무겁게 느껴지더라고요. 그래서 표시줄을 Rust로 새로 만들고, 쓰면서 필요했던 편의 기능도 하나씩 붙였습니다.
 
-이 배포판에는 **Rust 상태 표시줄 GlazeBar와 GlazeWM 3.10.1이 모두 포함**되어 있습니다.
+이 배포판에는 **Rust 상태 표시줄 GlazeBar와 수정된 GlazeWM 3.10.1이 모두 포함**되어 있습니다.
 GlazeWM이 창과 작업공간을 관리하고, GlazeBar에서 시스템 상태를 확인하거나 밝기·Wi-Fi·배터리 상태 기타 등등을 확인할 수 있습니다.
 
 > GlazeWM 공식 배포판이 아닌 독립적인 커뮤니티 번들입니다! 저는 아무것도 몰라요
@@ -23,14 +23,10 @@ GlazeWM이 창과 작업공간을 관리하고, GlazeBar에서 시스템 상태�
 
 | 사용하는 PC | 통합 설치 프로그램 |
 | --- | --- |
-| Intel / AMD Windows | [x64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.4/GlazeBar-GlazeWM-Setup-0.1.0-preview.4-x64.exe) |
-| Windows on ARM | [ARM64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.4/GlazeBar-GlazeWM-Setup-0.1.0-preview.4-arm64.exe) |
+| Intel / AMD Windows | [x64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.7/GlazeBar-GlazeWM-Setup-0.1.0-preview.7-x64.exe) |
+| Windows on ARM | [ARM64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.7/GlazeBar-GlazeWM-Setup-0.1.0-preview.7-arm64.exe) |
 
 ## 설치
-
-0.1.0-preview.3에서는 Wi-Fi를 사용할 수 없는 PC에서 해당 항목을 숨깁니다. 팝업을 한 번도 클릭하지 않았더라도 다른 창이나 Bar를 클릭하면 닫힙니다. 팝업 내부 입력란과 하위 설정 창으로 이동할 때는 유지됩니다.
-
-0.1.0-preview.2에서는 WMI 밝기 조절을 지원하지 않는 PC에서 바가 종료되는 문제를 수정했습니다. 상주 프로세스 이름은 `GlazeBar.exe`, Windows 파일 설명은 `GlazeBar`입니다. 노트북·데스크탑 구분 대신 모니터의 기능 지원 여부를 확인하며, 지원하지 않는 밝기 조작은 비활성화됩니다. 외부 모니터 DDC/CI 제어는 아직 포함되지 않습니다.
 
 1. PC에 맞는 설치 EXE를 다운로드합니다.
 2. 실행 중인 GlazeWM과 GlazeBar가 있다면 종료합니다.
@@ -38,10 +34,14 @@ GlazeWM이 창과 작업공간을 관리하고, GlazeBar에서 시스템 상태�
 4. 시작 메뉴의 **GlazeBar + GlazeWM**을 실행합니다.
 
 **명령어 입력이나 별도의 GlazeWM 다운로드는 필요하지 않습니다.** 기존 설정은 설치 전에 백업합니다.
-x64와 ARM64 모두 사용자 폴더의 수정 GlazeWM 3.10.1-glazebar.1을 실행합니다. 공식 3.10.1은 CLI 호환성과 원복용으로 유지합니다. 다른 버전이나 이전 커뮤니티 번들이 있으면 안내에 따라 먼저 정리해야 합니다.
+x64와 ARM64 모두 사용자 폴더의 수정 GlazeWM 3.10.1-glazebar.2를 실행합니다. 공식 3.10.1은 CLI 호환성과 원복용으로 유지합니다.
 
 GlazeBar에는 .NET·Go·WebView2 설치가 필요 없습니다. GlazeWM에 필요한 Visual C++ 런타임이 없는 경우에만 Microsoft 설치 프로그램을 내려받도록 안내합니다.
 GlazeWM 및 런타임 설치 중 Windows 관리자 권한 확인이 나타날 수 있습니다.
+
+### 기존 버전에서 업데이트
+
+GlazeWM과 GlazeBar를 종료하고 **Windows 설정 → 앱 → GlazeBar + GlazeWM (community setup)**에서 기존 버전을 제거한 뒤 새 설치 프로그램을 실행하세요. 제거할 때 설치 전 파일은 복원되고, 설치 후 직접 수정한 파일은 따로 보관됩니다. 내 설정을 새 설치로 옮길 때 이 백업을 쓰면 됩니다.
 
 ## 주요 기능
 
@@ -65,7 +65,7 @@ VS Code도 같이 바뀝니다. 영상은 Python이지만 Rust, JavaScript 등 �
 - **밝기·배율 직접 조절** — 표시줄의 밝기 슬라이더와 아이콘 아래 배율 메뉴
 - **Wi-Fi 연결 메뉴** — 주변 네트워크 검색, 선택 및 연결
 - **전원 구성표 전환** — 고성능·균형·절전을 표시줄에서 선택
-- **배경화면 선택기** — 로컬 사진 탐색과 Wallhaven 검색·다운로드
+- **배경화면 선택기** — 로컬 사진 탐색과 Wallhaven 검색·다운로드. 검색 필터, 페이지 이동, 검색어·태그 즐겨찾기, 영구 미리보기 캐시, 하트 보관함을 지원합니다. ([사용법](docs/wallhaven-browser.md))
 - **사진 기반 테마 생성** — 색상 추출, 다크·라이트 전환, 6가지 스타일 비교와 미리보기
 - **앱·Windows 색상 연동** — 원하는 앱끼리 색상 맞추기
 - **색상 복원과 캐시** — 이전 색상으로 돌아가기, 뽑아둔 색상 재사용하기
@@ -85,7 +85,28 @@ VS Code도 같이 바뀝니다. 영상은 Python이지만 Rust, JavaScript 등 �
 Windows 쪽은 바꾸고 싶은 항목만 따로 고를 수 있습니다. 작업 표시줄 강조색은 다크 모드에서 써주세요.
 앱 연동은 Windows 설치 기준입니다. WSL 안의 Codex 설정은 아직 따로 적용해야 합니다.
 
-### 메모리·CPU 사용량
+주석 색상은 본문과 구분되는 차분한 색조를 유지하면서 배경 대비를 확보합니다. [자세히](docs/comment-colors.md)
+
+## 수정된 GlazeWM
+
+[원본 GlazeWM](https://github.com/glzr-io/glazewm) v3.10.1에 아래 변경을 더한 빌드(3.10.1-glazebar.2)를 포함합니다.
+
+- **Alt+M 최소화·복원** — 현재 작업공간의 창을 실제로 최소화하고, 분할 구조·비율·포커스 순서를 그대로 복원합니다.
+- **빈 분할 정리** — 창을 닫거나 옮긴 뒤 남는 빈 분할 컨테이너를 정리해 공간을 되돌려 줍니다.
+- **포커스 처리 개선** — 이미 포커스된 창에 불필요한 입력을 보내지 않고, 실제 OS 포커스와 WM 상태를 비교합니다.
+
+패치와 변경 내역은 [GlazeWM 변경 내역](docs/glazewm-modifications.md)에 있습니다. GlazeWM은 원본의 GPL-3.0 라이선스를 따르며, 수정본 소스는 설치 프로그램에 포함됩니다.
+
+## 단축키
+
+| 단축키 | 동작 |
+| --- | --- |
+| `Win + F1` | 전체 단축키 안내 |
+| `Win + Alt + Shift + B` | 상태 표시줄 표시 / 숨기기 |
+| `Win + Ctrl + Alt + Space` | 배경화면 선택 |
+| `Alt + Shift + E` | GlazeWM 종료 |
+
+## 메모리·CPU 사용량
 
 제 **Surface Pro 11 · Snapdragon X Plus X1P-64-100(10코어) · Windows 11 ARM64**에서 확인했습니다.
 
@@ -98,13 +119,6 @@ Windows 쪽은 바꾸고 싶은 항목만 따로 고를 수 있습니다. 작업
 
 메모리는 꽤 가벼워졌습니다! 개발하면서 따로 측정한 값이라 CPU 차이는 참고 정도로 봐주세요. Zebar는 자식 프로세스 합계, Rust는 구간 평균이며 자세한 조건은 [측정 기록](docs/performance.md)에 남겨뒀습니다.
 
-| 단축키 | 동작 |
-| --- | --- |
-| `Win + F1` | 전체 단축키 안내 |
-| `Win + Alt + Shift + B` | 상태 표시줄 표시 / 숨기기 |
-| `Win + Ctrl + Alt + Space` | 배경화면 선택 |
-| `Alt + Shift + E` | GlazeWM 종료 |
-
 ## 제거와 설정 복원
 
 GlazeWM과 GlazeBar를 종료한 뒤 **Windows 설정 → 앱 → GlazeBar + GlazeWM (community setup)**에서 제거합니다.
@@ -114,13 +128,21 @@ GlazeWM까지 지우려면 앱 목록에서 **GlazeWM**도 제거해주세요. �
 
 ## 참고
 
-- Windows 11 ARM64 / x64
+- Windows 11 x64 / ARM64. ARM64 패키지는 x64에서 교차 빌드했습니다.
 - 아직 미리보기 버전이고 코드 서명은 없습니다.
-- preview.4: 실제 x64에서 확인했습니다. ARM64는 교차 빌드 및 패키지 검사만 완료했으며 실제 ARM64 실행 검증은 별도입니다.
-- 밝기와 전원 설정은 기기에 따라 다를 수 있습니다.
+- 밝기와 전원 설정은 기기에 따라 다를 수 있습니다. 외부 모니터의 DDC/CI 밝기 제어는 아직 없습니다.
 - 날씨는 일단 서울입니다. Open-Meteo 무료 API를 사용합니다([이용 조건](https://open-meteo.com/en/terms)).
 
 문제가 있거나 원하는 기능이 있으면 [Issues](https://github.com/lamininA1/GlazeBar/issues)에 남겨주세요!
+
+## 변경 내역
+
+- **preview.7** — GlazeWM에서 창을 옮길 때 작업공간·모니터 정보가 사라져 오류가 반복되던 문제를 수정했습니다. 빈 분할 정리는 화면을 다시 그리기 직전에 하도록 바꿨습니다.
+- **preview.6** — 주석 색상이 본문 색으로 바뀌던 문제를 수정했습니다. 업데이트 후 배경화면/테마를 다시 선택하고 VS Code에 적용하면 새 팔레트가 반영됩니다.
+- **preview.5** — Wallhaven 검색 필터, 페이지 이동, 검색어·태그 즐겨찾기, 영구 미리보기 캐시, 하트 보관함, 캐시 용량 표시.
+- **preview.4** — 수정 GlazeWM 포함: Alt+M 최소화·복원, 빈 분할 정리, 포커스 처리. x64 / ARM64.
+- **preview.3** — Wi-Fi를 쓸 수 없는 PC에서는 해당 항목을 숨깁니다. 팝업은 다른 창이나 Bar를 클릭하면 닫히고, 팝업 안의 입력란과 하위 설정 창으로 이동할 때는 유지됩니다.
+- **preview.2** — WMI 밝기 조절이 없는 PC에서 바가 종료되던 문제를 수정했습니다. 밝기는 모니터별 지원 여부에 따라 활성화됩니다.
 
 ## 소스와 라이선스
 
