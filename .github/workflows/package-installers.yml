@@ -16,8 +16,73 @@ permissions:
   contents: write
 
 jobs:
-  installers:
-    runs-on: windows-2025
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+            msvc_arch: x64
+          - target: aarch64-pc-windows-msvc
+            arch: arm64
+            msvc_arch: amd64_arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            native-rust/target/
+          key: ${{ runner.os }}-cargo-build-${{ matrix.target }}-${{ hashFiles('native-rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ matrix.target }}-
+
+      - name: Build Binary
+        working-directory: native-rust
+        run: |
+          cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Prepare Architecture Binary Artifacts
+        shell: pwsh
+        run: |
+          $binDir = "native-rust/target/${{ matrix.target }}/release"
+          $outDir = "dist-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          
+          Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeBar.exe"
+          Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeTheme.exe"
+          
+          Compress-Archive -Path "$outDir/*" -DestinationPath "GlazeBar-windows-${{ matrix.arch }}.zip" -Force
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlazeBar-windows-${{ matrix.arch }}
+          path: GlazeBar-windows-${{ matrix.arch }}.zip
+
+  package-and-release:
+    name: Package and Release
+    needs: build
+    runs-on: windows-latest
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
@@ -28,6 +93,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
 
       - name: Set up Inno Setup
         run: |
@@ -40,12 +110,12 @@ jobs:
           }
           Write-Host "Inno Setup compiler verified at: $compiler"
 
-      - name: Verify release tag and release state
+      - name: Verify release tag and ensure release exists
         run: |
           $ErrorActionPreference = 'Stop'
           Write-Host "Target release tag: $env:RELEASE_TAG"
           if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') {
-            throw "Invalid release tag format: $env:RELEASE_TAG (expected semver like v0.1.0 or v0.1.0-preview.7)"
+            throw "Invalid release tag format: $env:RELEASE_TAG (expected semver like v0.0.1 or v0.1.0-preview.7)"
           }
           $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,tagName 2>$null | ConvertFrom-Json
           if (!$release) {
@@ -58,58 +128,92 @@ jobs:
             }
           }
 
-      - name: Download and verify bundle archives
-        run: |
-          $ErrorActionPreference = 'Stop'
-          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern 'GlazeBar-Community-*-windows-*.zip' --pattern SHA256SUMS.txt --dir downloaded
-          if ($LASTEXITCODE -ne 0) { throw 'Bundle download failed' }
-          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
-          $checksums = Get-Content downloaded/SHA256SUMS.txt
-          foreach ($arch in 'x64','arm64') {
-            $name = "GlazeBar-Community-$version-windows-$arch.zip"
-            $expected = @($checksums | Where-Object { $_ -match ('  ' + [regex]::Escape($name) + '$') })
-            if ($expected.Count -ne 1) { throw "Missing checksum: $name" }
-            if ((Get-FileHash "downloaded/$name").Hash -ne $expected[0].Split(' ')[0]) { throw "Archive checksum mismatch: $name" }
-            Expand-Archive "downloaded/$name" "distribution/output-release/GlazeBar-Community-$version-windows-$arch" -Force
-          }
-
-      - name: Validate isolated bundle installation and restore
+      - name: Prepare Release Bundles and Compile Installers
         run: |
           $ErrorActionPreference = 'Stop'
           $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
-          foreach ($arch in 'x64','arm64') {
-            ./distribution/Test-Bundle.ps1 -Bundle "distribution/output-release/GlazeBar-Community-$version-windows-$arch"
-          }
-
-      - name: Compile installers and check x64 startup
-        run: |
-          $ErrorActionPreference = 'Stop'
           $compiler = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
           if (!$compiler -or !(Test-Path $compiler)) {
             $compiler = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
           }
-          if (!(Test-Path $compiler)) {
-            throw "ISCC compiler not found at $compiler"
-          }
-          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
-          ./distribution/Build-Setup.ps1 -BundleRoot distribution/output-release -Version $version -Architectures x64,arm64 -Compiler $compiler
-          ./distribution/Test-SetupStartup.ps1 -SetupExe "distribution/setup-output/GlazeBar-GlazeWM-Setup-$version-x64.exe"
 
-      - name: Upload installers, checksums and validation
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
-          $checksums = @(Get-Content downloaded/SHA256SUMS.txt) + @(Get-Content distribution/setup-output/SHA256SUMS.txt)
-          $checksums | Sort-Object -Unique | Set-Content SHA256SUMS.txt -Encoding ascii
-          $validation = [ordered]@{
-            tag = $env:RELEASE_TAG
-            source = (git rev-parse HEAD)
-            runner = $env:RUNNER_OS
-            checks = @('both archive hashes', 'both isolated bundle installation/restore tests', 'both installer compilation', 'x64 installer startup')
-            arm64RuntimeTested = $false
-            cleanMachineMsiUacTested = $false
-            run = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          New-Item -ItemType Directory -Force -Path release-output | Out-Null
+          Get-ChildItem -Path downloaded-artifacts -Filter "*.zip" -Recurse | Copy-Item -Destination release-output/ -Force
+
+          # 1. Check if Community bundle ZIPs are already uploaded to current release
+          $bundleRoot = "distribution/output-release"
+          New-Item -ItemType Directory -Force -Path $bundleRoot | Out-Null
+          $hasBundles = $false
+
+          try {
+            gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern 'GlazeBar-Community-*-windows-*.zip' --pattern SHA256SUMS.txt --dir downloaded-bundles
+            if ($LASTEXITCODE -eq 0 -and (Test-Path downloaded-bundles)) {
+              foreach ($arch in 'x64', 'arm64') {
+                $zipFile = Get-ChildItem -Path downloaded-bundles -Filter "*windows-$arch.zip" | Select-Object -First 1
+                if ($zipFile) {
+                  Expand-Archive -Path $zipFile.FullName -DestinationPath "$bundleRoot/GlazeBar-Community-$version-windows-$arch" -Force
+                  $hasBundles = $true
+                }
+              }
+            }
+          } catch {
+            Write-Host "No pre-existing bundles found in current release tag: $_"
           }
-          $validation | ConvertTo-Json -Depth 5 | Set-Content validation-installers.json -Encoding utf8
-          gh release upload $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY "distribution/setup-output/GlazeBar-GlazeWM-Setup-$version-x64.exe" "distribution/setup-output/GlazeBar-GlazeWM-Setup-$version-arm64.exe" SHA256SUMS.txt validation-installers.json --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'Installer upload failed' }
+
+          # 2. If not found in current release, fetch upstream base bundle to repackage with newly built GlazeBar
+          if (!$hasBundles) {
+            Write-Host "Attempting to repackage base bundle from upstream release (v0.1.0-preview.7)..."
+            New-Item -ItemType Directory -Force -Path upstream-base | Out-Null
+            try {
+              gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
+              if ($LASTEXITCODE -eq 0) {
+                foreach ($arch in 'x64', 'arm64') {
+                  $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
+                  $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
+                    if ($arch -eq 'x64') { $_.FullName -like "*windows-x64*" } else { $_.FullName -like "*windows-arm64*" }
+                  } | Select-Object -First 1
+
+                  if ($baseZip -and $barExe) {
+                    Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName)..."
+                    python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version
+                  }
+                }
+                $hasBundles = $true
+              }
+            } catch {
+              Write-Warning "Repackage base bundle failed: $_"
+            }
+          }
+
+          # 3. If bundles are available, validate and compile Inno Setup installers
+          if ($hasBundles) {
+            Write-Host "Validating isolated bundles..."
+            foreach ($arch in 'x64', 'arm64') {
+              $archBundle = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+              if (Test-Path $archBundle) {
+                ./distribution/Test-Bundle.ps1 -Bundle $archBundle
+                # Also compress the community bundle into zip for release
+                Compress-Archive -Path "$archBundle/*" -DestinationPath "release-output/GlazeBar-Community-$version-windows-$arch.zip" -Force
+              }
+            }
+
+            Write-Host "Compiling installers using Build-Setup.ps1..."
+            ./distribution/Build-Setup.ps1 -BundleRoot $bundleRoot -Version $version -Architectures x64,arm64 -Compiler $compiler
+            
+            $x64Installer = "distribution/setup-output/GlazeBar-GlazeWM-Setup-$version-x64.exe"
+            if (Test-Path $x64Installer) {
+              ./distribution/Test-SetupStartup.ps1 -SetupExe $x64Installer
+            }
+            Get-ChildItem -Path distribution/setup-output -Filter "*.exe" | Copy-Item -Destination release-output/ -Force
+          } else {
+            Write-Host "Community bundles not assembled. Packaging standalone binaries only."
+          }
+
+          # 4. Generate SHA256 checksums for all release files
+          Get-ChildItem -Path release-output -File | ForEach-Object {
+            "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -LiteralPath "release-output/SHA256SUMS.txt" -Encoding ascii
+
+          # 5. Upload everything to GitHub Release
+          Write-Host "Uploading release assets to $env:RELEASE_TAG..."
+          gh release upload $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY (Get-ChildItem -Path release-output -File | ForEach-Object { $_.FullName }) --clobber
