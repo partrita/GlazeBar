@@ -1992,10 +1992,7 @@ pub fn run_with_popup(
                                         if matches!(other, E::CycleCity) {
                                             city_changed = Some(v.weather_city);
                                         }
-                                        if matches!(
-                                            other,
-                                            E::CycleTerminal | E::CycleBrowser | E::CycleGap
-                                        ) {
+                                        if matches!(other, E::CycleTerminal | E::CycleBrowser) {
                                             reload_wm = true;
                                         }
                                     }

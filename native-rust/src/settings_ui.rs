@@ -140,7 +140,6 @@ pub enum Edit {
     ToggleAutoSplit,
     CycleTerminal,
     CycleBrowser,
-    CycleGap,
     ToggleTarget(usize),
     SelectAllTargets(bool),
     OpenConfig,
@@ -192,14 +191,6 @@ impl BarSettings {
                     cmd,
                 );
             }
-            if let Some((_, gap)) = GAPS.get(self.gap_idx) {
-                updated = crate::theme_text::glazewm_set_scalar(
-                    &updated,
-                    &["gaps"],
-                    "inner_gap",
-                    &format!("'{gap}'"),
-                );
-            }
             if updated != source {
                 let _ = crate::theme_transaction::atomic_write(&config_path, updated.as_bytes());
             }
@@ -221,7 +212,6 @@ impl BarSettings {
             Edit::ToggleAutoSplit => self.auto_split = !self.auto_split,
             Edit::CycleTerminal => self.terminal_idx = (self.terminal_idx + 1) % TERMINALS.len(),
             Edit::CycleBrowser => self.browser_idx = (self.browser_idx + 1) % BROWSERS.len(),
-            Edit::CycleGap => self.gap_idx = (self.gap_idx + 1) % GAPS.len(),
             Edit::ToggleTarget(i) => {
                 if let Some(t) = self.targets.get_mut(*i) {
                     *t = !*t;
@@ -391,9 +381,8 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         .get(v.browser_idx)
         .map(|b| b.0)
         .unwrap_or(BROWSERS[0].0);
-    let gap_label = GAPS.get(v.gap_idx).map(|g| g.0).unwrap_or(GAPS[2].0);
-
-    let r_term = Rect::new(s(38.), s(276.), s(280.), s(32.));
+    let btn_w = (w - s(96.)) / 2;
+    let r_term = Rect::new(s(38.), s(276.), btn_w, s(32.));
     views::button(
         c,
         &mut hits,
@@ -405,7 +394,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         Action::Settings(Edit::CycleTerminal),
     );
 
-    let r_brow = Rect::new(s(328.), s(276.), s(280.), s(32.));
+    let r_brow = Rect::new(s(38.) + btn_w + s(20.), s(276.), btn_w, s(32.));
     views::button(
         c,
         &mut hits,
@@ -415,18 +404,6 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         hover.is_some_and(|(x, y)| r_brow.contains(x, y)),
         true,
         Action::Settings(Edit::CycleBrowser),
-    );
-
-    let r_gap = Rect::new(s(618.), s(276.), w - s(656.), s(32.));
-    views::button(
-        c,
-        &mut hits,
-        &format!("창 간격: {gap_label}"),
-        r_gap,
-        false,
-        hover.is_some_and(|(x, y)| r_gap.contains(x, y)),
-        true,
-        Action::Settings(Edit::CycleGap),
     );
 
     // Section 3: 테마 자동 적용 대상 프로그램

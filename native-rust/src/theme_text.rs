@@ -305,6 +305,7 @@ user_pref(\"browser.theme.toolbar-theme\", {scheme_override});\n\
     replace_delimited_block(source, &block)
 }
 
+#[allow(dead_code)]
 pub fn glazewm_set_scalar(source: &str, section_path: &[&str], key: &str, new_val: &str) -> String {
     let mut lines: Vec<String> = source.split('\n').map(str::to_owned).collect();
     let mut stack: Vec<(usize, String)> = vec![];
