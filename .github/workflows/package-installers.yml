@@ -151,8 +151,11 @@ jobs:
               foreach ($arch in 'x64', 'arm64') {
                 $zipFile = Get-ChildItem -Path downloaded-bundles -Filter "*windows-$arch.zip" | Select-Object -First 1
                 if ($zipFile) {
-                  Expand-Archive -Path $zipFile.FullName -DestinationPath "$bundleRoot/GlazeBar-Community-$version-windows-$arch" -Force
-                  $hasBundles = $true
+                  $targetDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+                  Expand-Archive -Path $zipFile.FullName -DestinationPath $targetDir -Force
+                  if (Test-Path "$targetDir/manifest.json") {
+                    $hasBundles = $true
+                  }
                 }
               }
             }
@@ -166,7 +169,15 @@ jobs:
             New-Item -ItemType Directory -Force -Path upstream-base | Out-Null
             try {
               gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
-              if ($LASTEXITCODE -eq 0) {
+              if ($LASTEXITCODE -eq 0 -and (Test-Path upstream-base)) {
+                # Extract GlazeBar.exe from downloaded build artifacts
+                $artifactZips = Get-ChildItem -Path downloaded-artifacts -Filter "*.zip" -Recurse
+                foreach ($az in $artifactZips) {
+                  Write-Host "Extracting build artifact: $($az.FullName)"
+                  Expand-Archive -Path $az.FullName -DestinationPath $az.DirectoryName -Force
+                }
+
+                $repackageSuccess = $true
                 foreach ($arch in 'x64', 'arm64') {
                   $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
                   $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
@@ -176,25 +187,42 @@ jobs:
                   if ($baseZip -and $barExe) {
                     Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName)..."
                     python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version
+                    $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+                    if (!(Test-Path "$expectedDir/manifest.json")) {
+                      Write-Warning "Repackaged bundle missing manifest: $expectedDir"
+                      $repackageSuccess = $false
+                    }
+                  } else {
+                    Write-Warning "Missing baseZip or barExe for $arch (baseZip: $($baseZip?.Name), barExe: $($barExe?.FullName))"
+                    $repackageSuccess = $false
                   }
                 }
-                $hasBundles = $true
+                $hasBundles = $repackageSuccess
               }
             } catch {
               Write-Warning "Repackage base bundle failed: $_"
+              $hasBundles = $false
             }
           }
+
+          # Verify both bundle folders exist and contain manifest.json before proceeding to installer build
+          $bundlesVerified = $true
+          foreach ($arch in 'x64', 'arm64') {
+            $checkDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+            if (!(Test-Path "$checkDir/manifest.json")) {
+              $bundlesVerified = $false
+            }
+          }
+          $hasBundles = $bundlesVerified
 
           # 3. If bundles are available, validate and compile Inno Setup installers
           if ($hasBundles) {
             Write-Host "Validating isolated bundles..."
             foreach ($arch in 'x64', 'arm64') {
               $archBundle = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
-              if (Test-Path $archBundle) {
-                ./distribution/Test-Bundle.ps1 -Bundle $archBundle
-                # Also compress the community bundle into zip for release
-                Compress-Archive -Path "$archBundle/*" -DestinationPath "release-output/GlazeBar-Community-$version-windows-$arch.zip" -Force
-              }
+              ./distribution/Test-Bundle.ps1 -Bundle $archBundle
+              # Also compress the community bundle into zip for release
+              Compress-Archive -Path "$archBundle/*" -DestinationPath "release-output/GlazeBar-Community-$version-windows-$arch.zip" -Force
             }
 
             Write-Host "Compiling installers using Build-Setup.ps1..."

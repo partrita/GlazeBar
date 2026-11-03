@@ -20,7 +20,7 @@ foreach ($arch in $Architectures) {
     foreach ($file in $manifest.files) {
         if ((Get-FileHash -LiteralPath (Join-Path $bundle $file.path)).Hash -ne $file.sha256) { throw "Bundle integrity failed: $($file.path)" }
     }
-    $arguments = @('/Q', "/DBundleDir=$bundle", "/DOutputDir=$OutputDirectory", "/DArch=$arch")
+    $arguments = @('/Q', "/DBundleDir=$bundle", "/DOutputDir=$OutputDirectory", "/DArch=$arch", "/DAppVersion=$Version")
     if ($TestProfile) { $arguments += "/DTestProfile=$([IO.Path]::GetFullPath($TestProfile))" }
     & $Compiler @arguments (Join-Path $PSScriptRoot 'GlazeBar-Setup.iss')
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed: $arch" }
