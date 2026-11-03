@@ -56,6 +56,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ matrix.target }}-
 
+      - name: Update resource version to match target release
+        shell: pwsh
+        run: |
+          $rawTag = '${{ inputs.tag != '' && inputs.tag || github.ref_name }}'
+          $version = if ($rawTag.StartsWith('v')) { $rawTag.Substring(1) } else { $rawTag }
+          Write-Host "Updating native-rust/glazebar.rc version to: $version"
+          
+          # Convert version like '0.0.1' or '0.1.0-preview.7' to comma-separated numbers for FILEVERSION/PRODUCTVERSION
+          $coreVer = $version.Split('-')[0]
+          $parts = $coreVer.Split('.')
+          while ($parts.Length -lt 4) { $parts += '0' }
+          $commas = $parts[0..3] -join ','
+
+          $rcPath = "native-rust/glazebar.rc"
+          $rcContent = Get-Content $rcPath -Raw
+          $rcContent = $rcContent -replace 'FILEVERSION\s+[\d,]+', "FILEVERSION $commas"
+          $rcContent = $rcContent -replace 'PRODUCTVERSION\s+[\d,]+', "PRODUCTVERSION $commas"
+          $rcContent = $rcContent -replace 'VALUE "FileVersion",\s*"[^"]*"', "VALUE `"FileVersion`", `"$version\0`""
+          $rcContent = $rcContent -replace 'VALUE "ProductVersion",\s*"[^"]*"', "VALUE `"ProductVersion`", `"$version\0`""
+          Set-Content -Path $rcPath -Value $rcContent -Encoding ascii
+          Get-Content $rcPath
+
       - name: Build Binary
         working-directory: native-rust
         run: |
