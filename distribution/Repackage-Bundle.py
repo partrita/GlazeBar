@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--bar', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--version', default='0.1.0-preview.7')
+    parser.add_argument('--slim', action='store_true', help='create a slim runtime-only bundle without source and vendor archives')
     parser.add_argument('--wm-runtime', type=Path, help='folder with the rebuilt glazewm.exe and glazewm-watcher.exe')
     parser.add_argument('--wm-source', type=Path, help='git checkout of the modified GlazeWM source')
     parser.add_argument('--wm-version', help='VERSION_NUMBER the modified GlazeWM was built with')
@@ -124,6 +125,14 @@ def main():
         'unchangedComponents': unchanged, **wm_provenance,
     }
     (folder / 'source/BUILD-GLAZEBAR.json').write_text(json.dumps(provenance, indent=2), encoding='utf-8')
+    if args.slim:
+        import shutil
+        source_dir = folder / 'source'
+        if source_dir.exists():
+            for item in list(source_dir.glob('*.zip')):
+                item.unlink(missing_ok=True)
+            for item in list(source_dir.glob('*.tar*')):
+                item.unlink(missing_ok=True)
     manifest['version'] = args.version
     manifest['files'] = [{'path': p.relative_to(folder).as_posix(), 'sha256': sha(p.read_bytes())}
                          for p in sorted(folder.rglob('*')) if p.is_file() and p.name != 'manifest.json']

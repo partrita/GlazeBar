@@ -207,8 +207,8 @@ jobs:
                   } | Select-Object -First 1
 
                   if ($baseZip -and $barExe) {
-                    Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName)..."
-                    python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version
+                    Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName) (Slim)..."
+                    python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version --slim
                     $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
                     if (!(Test-Path "$expectedDir/manifest.json")) {
                       Write-Warning "Repackaged bundle missing manifest: $expectedDir"
