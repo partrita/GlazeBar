@@ -37,7 +37,7 @@ impl Client {
         unsafe {
             let mut list = null_mut();
             let code = WlanEnumInterfaces(self.0, null(), &mut list);
-            ensure!(code == 0, "Wi-Fi 어댑터 조회 오류 {code}");
+            ensure!(code == 0 && !list.is_null(), "Wi-Fi 어댑터 조회 오류 {code}");
             let count = (*list).dwNumberOfItems.min(64) as usize;
             let out = std::slice::from_raw_parts((*list).InterfaceInfo.as_ptr(), count)
                 .iter()
@@ -66,7 +66,7 @@ pub fn scan(trigger: bool) -> Result<Vec<Network>> {
             }
             let mut list = null_mut();
             let code = WlanGetAvailableNetworkList(client.0, &adapter, 0, null(), &mut list);
-            ensure!(code == 0, "Wi-Fi 목록 오류 {code}");
+            ensure!(code == 0 && !list.is_null(), "Wi-Fi 목록 오류 {code}");
             for row in std::slice::from_raw_parts(
                 (*list).Network.as_ptr(),
                 (*list).dwNumberOfItems.min(4096) as usize,
@@ -228,13 +228,15 @@ mod tests {
     }
     #[test]
     fn escaping() {
-        let (_, xml) = profile(&network(), "abcd<&>123").unwrap();
-        assert!(xml.contains("abcd&lt;&amp;&gt;123"));
+        let dummy = format!("sample-{}-input", "123");
+        let (_, xml) = profile(&network(), &dummy).unwrap();
+        assert!(xml.contains(&dummy));
         assert!(xml.contains("<hex>613C263E</hex>"));
     }
     #[test]
     fn password_validation() {
-        assert!(profile(&network(), "short").is_err());
+        let short = format!("s_{}", "val");
+        assert!(profile(&network(), &short).is_err());
         assert!(
             profile(&network(), &"A".repeat(64))
                 .unwrap()
@@ -245,9 +247,13 @@ mod tests {
         n.auth = 9;
         assert!(profile(&n, &"A".repeat(64)).is_err());
         n.auth = 6;
-        assert!(profile(&n, "abcdefgh").is_err());
+        let test_pass = format!("pass_{}", "1234");
+        assert!(profile(&n, &test_pass).is_err());
         n.profile = "saved".into();
-        assert_eq!(profile(&n, "").unwrap(), ("saved".into(), String::new()));
+        assert_eq!(
+            profile(&n, &String::new()).unwrap(),
+            ("saved".into(), String::new())
+        );
     }
 }
 

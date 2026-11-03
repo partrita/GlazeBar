@@ -260,6 +260,7 @@ pub fn connected_network() -> (bool, String, u32) {
                     &mut data,
                     &mut ty,
                 ) == 0
+                    && !data.is_null()
                 {
                     if size as usize >= size_of::<WLAN_CONNECTION_ATTRIBUTES>() {
                         let a = &(*(data as *const WLAN_CONNECTION_ATTRIBUTES))
