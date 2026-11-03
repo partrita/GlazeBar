@@ -37,7 +37,10 @@ impl Client {
         unsafe {
             let mut list = null_mut();
             let code = WlanEnumInterfaces(self.0, null(), &mut list);
-            ensure!(code == 0 && !list.is_null(), "Wi-Fi 어댑터 조회 오류 {code}");
+            ensure!(
+                code == 0 && !list.is_null(),
+                "Wi-Fi 어댑터 조회 오류 {code}"
+            );
             let count = (*list).dwNumberOfItems.min(64) as usize;
             let out = std::slice::from_raw_parts((*list).InterfaceInfo.as_ptr(), count)
                 .iter()

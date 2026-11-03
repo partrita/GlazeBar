@@ -793,6 +793,7 @@ mod tests {
             busy: false,
             palette: None,
             status: String::new(),
+            open_dropdown: None,
         };
         p.select(-1);
         assert_eq!(p.selected, 2);
