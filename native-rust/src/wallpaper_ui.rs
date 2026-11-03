@@ -35,6 +35,22 @@ pub const ALL_MODES: [&str; 12] = [
     "dracula",
     "tokyo-night",
 ];
+pub const STYLES: [&str; 6] = [
+    "기본",
+    "차분하게",
+    "파스텔",
+    "머티리얼",
+    "선명하게",
+    "고대비",
+];
+pub const THEMES: [&str; 6] = [
+    "Catppuccin",
+    "Everforest",
+    "Rosé Pine",
+    "Monokai",
+    "Dracula",
+    "Tokyo Night",
+];
 pub const NAMES: [&str; 12] = [
     "기본",
     "차분하게",
@@ -49,11 +65,19 @@ pub const NAMES: [&str; 12] = [
     "Dracula",
     "Tokyo Night",
 ];
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Dropdown {
+    Style,
+    Theme,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
     Select(i32),
     Enabled,
-    Mode,
+    SetMode(usize),
+    ToggleDropdown(Dropdown),
+    CloseDropdown,
     Light(bool),
     Online,
     Folder,
@@ -63,6 +87,7 @@ pub enum Action {
     Compare,
     Restore,
     Apply,
+    Close,
 }
 pub struct Hit {
     pub rect: Rect,
@@ -86,6 +111,7 @@ pub struct Picker {
     pub busy: bool,
     pub palette: Option<crate::theme::Palette>,
     pub status: String,
+    pub open_dropdown: Option<Dropdown>,
 }
 impl Picker {
     pub fn load(root: &Path) -> anyhow::Result<Self> {
@@ -161,6 +187,7 @@ impl Picker {
             busy: false,
             palette: None,
             status: String::new(),
+            open_dropdown: None,
         })
     }
     pub fn select(&mut self, delta: i32) {
@@ -340,55 +367,86 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
     let s = |n: f64| (n * scale).round_ties_even() as i32;
     let w = c.width;
     let h = c.height;
+
+    // Title
     c.text(
         "배경화면",
-        Rect::new(s(28.), s(19.), s(115.), s(28.)),
+        Rect::new(s(28.), s(19.), s(90.), s(28.)),
         c.ui.text,
         17.,
         true,
         0,
     );
+
+    // 색상 함께 적용 토글
     toggle(
         c,
         &mut hits,
-        "색상 함께 적용",
-        Rect::new(s(145.), s(18.), s(140.), s(30.)),
+        "색상 적용",
+        Rect::new(s(122.), s(18.), s(95.), s(30.)),
         p.enabled,
         Action::Enabled,
         p.busy,
     );
-    let mode_prefix = if p.mode >= MODES.len() {
-        "테마"
+
+    // Style dropdown button
+    let style_name = if p.mode < MODES.len() {
+        STYLES[p.mode]
     } else {
-        "스타일"
+        "스타일 선택"
     };
+    let style_active = p.open_dropdown == Some(Dropdown::Style) || p.mode < MODES.len();
+    let style_rect = Rect::new(s(222.), s(18.), s(128.), s(30.));
     button(
         c,
         &mut hits,
-        &format!("{mode_prefix} · {}", NAMES[p.mode.min(NAMES.len() - 1)]),
-        Rect::new(s(295.), s(18.), s(140.), s(30.)),
-        p.mode >= MODES.len(),
-        Action::Mode,
+        &format!("스타일: {style_name} ▾"),
+        style_rect,
+        style_active,
+        Action::ToggleDropdown(Dropdown::Style),
         hover,
         p.busy,
     );
-    for (label, x, light) in [("다크", 450., false), ("라이트", 530., true)] {
+
+    // Theme dropdown button
+    let theme_name = if p.mode >= MODES.len() {
+        THEMES[p.mode - MODES.len()]
+    } else {
+        "테마 선택"
+    };
+    let theme_active = p.open_dropdown == Some(Dropdown::Theme) || p.mode >= MODES.len();
+    let theme_rect = Rect::new(s(356.), s(18.), s(138.), s(30.));
+    button(
+        c,
+        &mut hits,
+        &format!("테마: {theme_name} ▾"),
+        theme_rect,
+        theme_active,
+        Action::ToggleDropdown(Dropdown::Theme),
+        hover,
+        p.busy,
+    );
+
+    // Dark / Light toggle buttons
+    for (label, x, light) in [("다크", 500., false), ("라이트", 562., true)] {
         button(
             c,
             &mut hits,
             label,
-            Rect::new(s(x), s(18.), s(72.), s(30.)),
+            Rect::new(s(x), s(18.), s(58.), s(30.)),
             p.light == light,
             Action::Light(light),
             hover,
             p.busy,
         );
     }
+
+    // Top-right action buttons: 온라인 찾기, 폴더 선택, 닫기
     button(
         c,
         &mut hits,
         "온라인 찾기",
-        Rect::new(w - s(228.), s(17.), s(100.), s(30.)),
+        Rect::new(w - s(256.), s(18.), s(94.), s(30.)),
         false,
         Action::Online,
         hover,
@@ -398,22 +456,70 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         c,
         &mut hits,
         "폴더 선택",
-        Rect::new(w - s(116.), s(17.), s(96.), s(30.)),
+        Rect::new(w - s(156.), s(18.), s(88.), s(30.)),
         false,
         Action::Folder,
         hover,
         p.busy,
     );
-    let mw = (f64::from(w) * 0.68) as i32;
-    let mh = h - s(240.);
+    // 창닫기 버튼
+    button(
+        c,
+        &mut hits,
+        "닫기 ✕",
+        Rect::new(w - s(62.), s(18.), s(52.), s(30.)),
+        false,
+        Action::Close,
+        hover,
+        false,
+    );
+
+    // Smaller, refined preview
+    let mw = (f64::from(w) * 0.46) as i32;
+    let mh = (f64::from(mw) * (9.0 / 16.0)) as i32;
     let y = s(66.);
-    let side = s(30.).max((w - mw) / 2 - s(30.));
+    let side_w = s(36.).max((w - mw) / 2 - s(50.));
     let center = Rect::new((w - mw) / 2, y, mw, mh);
     let cards = [
-        Rect::new(s(14.), y + s(12.), side, mh - s(24.)),
+        Rect::new(
+            (w - mw) / 2 - side_w - s(16.),
+            y + s(14.),
+            side_w,
+            mh - s(28.),
+        ),
         center,
-        Rect::new(w - side - s(14.), y + s(12.), side, mh - s(24.)),
+        Rect::new((w - mw) / 2 + mw + s(16.), y + s(14.), side_w, mh - s(28.)),
     ];
+
+    // Navigation buttons (◀, ▶) beside preview
+    let prev_rect = Rect::new((w - mw) / 2 - s(38.), y + (mh - s(32.)) / 2, s(30.), s(32.));
+    let next_rect = Rect::new(
+        (w - mw) / 2 + mw + s(8.),
+        y + (mh - s(32.)) / 2,
+        s(30.),
+        s(32.),
+    );
+    button(
+        c,
+        &mut hits,
+        "◀",
+        prev_rect,
+        false,
+        Action::Select(-1),
+        hover,
+        p.busy || p.files.is_empty(),
+    );
+    button(
+        c,
+        &mut hits,
+        "▶",
+        next_rect,
+        false,
+        Action::Select(1),
+        hover,
+        p.busy || p.files.is_empty(),
+    );
+
     if p.files.is_empty() {
         c.text("사진 폴더를 선택해주세요", center, c.ui.text, 12., false, 1);
     } else {
@@ -451,18 +557,20 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
             } else {
                 &label
             },
-            Rect::new(s(24.), h - s(165.), w - s(48.), s(24.)),
+            Rect::new(s(24.), y + mh + s(8.), w - s(48.), s(22.)),
             c.ui.text,
             12.,
             false,
             1,
         );
     }
+
+    let palette_y = y + mh + s(34.);
     if !p.enabled {
         c.text(
-            "배경화면만 적용",
-            Rect::new(s(24.), h - s(126.), w - s(48.), s(18.)),
-            c.ui.text,
+            "배경화면만 적용 (색상 추출 비활성화)",
+            Rect::new(s(24.), palette_y, w - s(48.), s(18.)),
+            c.ui.muted,
             12.,
             false,
             1,
@@ -471,11 +579,14 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         let cell = (w - s(48.)) / 16;
         for (i, col) in palette.iter().enumerate() {
             c.fill(
-                Rect::new(s(24.) + i as i32 * cell, h - s(126.), cell + 1, s(18.)),
+                Rect::new(s(24.) + i as i32 * cell, palette_y, cell + 1, s(18.)),
                 crate::graphics::parse(col),
             );
         }
     }
+
+    // Targets line (GlazeBar, Terminal, Codex CLI, VS Code, Windows)
+    let bottom_row1_y = h - s(84.);
     for (i, label) in ["GlazeBar", "Terminal", "Codex CLI", "VS Code"]
         .iter()
         .enumerate()
@@ -484,7 +595,7 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
             c,
             &mut hits,
             label,
-            Rect::new(s((24 + i * 88) as f64), h - s(84.), s(86.), s(30.)),
+            Rect::new(s((24 + i * 86) as f64), bottom_row1_y, s(84.), s(30.)),
             p.targets[i],
             Action::Target(i),
             p.busy,
@@ -498,28 +609,49 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         } else {
             "Windows · 끔"
         },
-        Rect::new(s(382.), h - s(84.), s(94.), s(30.)),
+        Rect::new(s(374.), bottom_row1_y, s(94.), s(30.)),
         p.windows,
         Action::Windows,
         hover,
         p.busy,
     );
+
+    // Other utility buttons & prominent Apply button
     for (label, right, width, action) in [
-        ("전체 캐시 생성", 364., 124., Action::Precache),
-        ("스타일 비교", 228., 100., Action::Compare),
-        ("색상 복원", 116., 96., Action::Restore),
+        ("전체 캐시 생성", 456., 112., Action::Precache),
+        ("스타일 비교", 340., 100., Action::Compare),
+        ("색상 복원", 236., 96., Action::Restore),
     ] {
         button(
             c,
             &mut hits,
             label,
-            Rect::new(w - s(right), h - s(84.), s(width), s(30.)),
+            Rect::new(w - s(right), bottom_row1_y, s(width), s(30.)),
             false,
             action,
             hover,
             p.busy,
         );
     }
+
+    // Prominent "적용" (Apply) button
+    let apply_rect = Rect::new(w - s(124.), bottom_row1_y - s(2.), s(106.), s(34.));
+    let apply_over = hover.is_some_and(|(x, y)| apply_rect.contains(x, y));
+    let apply_bg = if apply_over {
+        crate::graphics::blend(c.ui.accent, 0xFFFFFF, 0.15)
+    } else {
+        c.ui.accent
+    };
+    c.fill(apply_rect, apply_bg);
+    c.frame(apply_rect, c.ui.border);
+    c.text("적용 (Enter)", apply_rect, 0x000000, 12.5, true, 1);
+    if !p.busy {
+        hits.push(Hit {
+            rect: apply_rect,
+            action: Action::Apply,
+        });
+    }
+
     let mut footer = p.status.clone();
     if footer.is_empty() {
         footer = format!(
@@ -549,6 +681,69 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         false,
         1,
     );
+
+    // If dropdown is open, render overlay popup menu on top and capture hits first
+    if let Some(dropdown) = p.open_dropdown {
+        let (anchor_rect, items, offset) = match dropdown {
+            Dropdown::Style => (style_rect, &STYLES[..], 0usize),
+            Dropdown::Theme => (theme_rect, &THEMES[..], MODES.len()),
+        };
+        let menu_w = anchor_rect.w.max(s(140.));
+        let item_h = s(28.);
+        let menu_h = item_h * items.len() as i32 + s(8.);
+        let menu_x = anchor_rect.x;
+        let menu_y = anchor_rect.y + anchor_rect.h + s(4.);
+        let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
+
+        // Outside click catcher hit to close dropdown
+        let mut dropdown_hits = vec![Hit {
+            rect: Rect::new(0, 0, w, h),
+            action: Action::CloseDropdown,
+        }];
+
+        // Draw shadow/frame and background
+        c.fill(menu_rect, c.ui.surface);
+        c.frame(menu_rect, c.ui.border);
+
+        for (idx, &item_label) in items.iter().enumerate() {
+            let item_rect = Rect::new(
+                menu_x + s(4.),
+                menu_y + s(4.) + idx as i32 * item_h,
+                menu_w - s(8.),
+                item_h,
+            );
+            let is_selected = p.mode == offset + idx;
+            let is_hover = hover.is_some_and(|(x, y)| item_rect.contains(x, y));
+            if is_selected {
+                c.fill(item_rect, c.ui.selected);
+            } else if is_hover {
+                c.fill(item_rect, c.ui.hover);
+            }
+            let text_color = if is_selected { c.ui.accent } else { c.ui.text };
+            c.text(
+                item_label,
+                Rect::new(
+                    item_rect.x + s(10.),
+                    item_rect.y,
+                    item_rect.w - s(20.),
+                    item_rect.h,
+                ),
+                text_color,
+                12.,
+                is_selected,
+                0,
+            );
+            dropdown_hits.push(Hit {
+                rect: item_rect,
+                action: Action::SetMode(offset + idx),
+            });
+        }
+
+        // Prepend dropdown hits so they take precedence over underlying controls
+        dropdown_hits.append(&mut hits);
+        hits = dropdown_hits;
+    }
+
     c.frame(Rect::new(0, 0, w, h), c.ui.border);
     hits
 }

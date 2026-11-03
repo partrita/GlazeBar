@@ -134,6 +134,7 @@ mod tests {
             busy: false,
             palette: None,
             status: String::new(),
+            open_dropdown: None,
         };
         assert!(prepare(&p).is_err());
         p.enabled = false;

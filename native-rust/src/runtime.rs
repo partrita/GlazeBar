@@ -1867,23 +1867,54 @@ pub fn run_with_popup(
                         }
                     }
                     Action::Picker(action) => {
+                        let mut close_wallpaper = false;
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
                             if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
                                 if !p.busy {
                                     use crate::wallpaper_ui::Action as P;
                                     let mut extract = true;
                                     match action {
-                                        P::Select(delta) => p.select(delta),
-                                        P::Enabled => p.enabled = !p.enabled,
-                                        P::Mode => {
-                                            p.mode =
-                                                (p.mode + 1) % crate::wallpaper_ui::ALL_MODES.len()
+                                        P::Select(delta) => {
+                                            p.open_dropdown = None;
+                                            p.select(delta);
                                         }
-                                        P::Light(light) => p.light = light,
+                                        P::Enabled => {
+                                            p.open_dropdown = None;
+                                            p.enabled = !p.enabled;
+                                        }
+                                        P::SetMode(m) => {
+                                            p.open_dropdown = None;
+                                            if p.mode != m {
+                                                p.mode = m;
+                                            } else {
+                                                extract = false;
+                                            }
+                                        }
+                                        P::ToggleDropdown(d) => {
+                                            p.open_dropdown = if p.open_dropdown == Some(d) {
+                                                None
+                                            } else {
+                                                Some(d)
+                                            };
+                                            extract = false;
+                                        }
+                                        P::CloseDropdown => {
+                                            p.open_dropdown = None;
+                                            extract = false;
+                                        }
+                                        P::Light(light) => {
+                                            p.open_dropdown = None;
+                                            p.light = light;
+                                        }
                                         P::Target(i) => {
+                                            p.open_dropdown = None;
                                             if let Some(v) = p.targets.get_mut(i) {
                                                 *v = !*v;
                                             }
+                                            extract = false;
+                                        }
+                                        P::Close => {
+                                            close_wallpaper = true;
                                             extract = false;
                                         }
                                         _ => {
@@ -1894,9 +1925,16 @@ pub fn run_with_popup(
                                     if extract {
                                         wallpaper_worker.request(hwnd, p);
                                     }
-                                    w.invalidate();
+                                    if !close_wallpaper {
+                                        w.invalidate();
+                                    }
                                 }
                             }
+                        }
+                        if close_wallpaper {
+                            child_popup = None;
+                            wallpaper_worker.cancel();
+                            popup = None;
                         }
                     }
                     Action::Sheet => send(&tx, thread, Update::Control("Sheet".into())),

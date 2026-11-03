@@ -114,7 +114,7 @@ impl Default for BarSettings {
             show_wifi: true,
             show_brightness: true,
             show_scale: true,
-            show_quick_buttons: true,
+            show_quick_buttons: false,
             weather_city: 0,
             auto_split: true,
             terminal_idx: 0,
