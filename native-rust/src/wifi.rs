@@ -37,10 +37,10 @@ impl Client {
         unsafe {
             let mut list = null_mut();
             let code = WlanEnumInterfaces(self.0, null(), &mut list);
-            ensure!(
-                code == 0 && !list.is_null(),
-                "Wi-Fi 어댑터 조회 오류 {code}"
-            );
+            let list = match std::ptr::NonNull::new(list) {
+                Some(ptr) => ptr.as_ptr(),
+                None => anyhow::bail!("Wi-Fi 어댑터 조회 오류 {code}"),
+            };
             let count = (*list).dwNumberOfItems.min(64) as usize;
             let out = std::slice::from_raw_parts((*list).InterfaceInfo.as_ptr(), count)
                 .iter()
@@ -69,7 +69,10 @@ pub fn scan(trigger: bool) -> Result<Vec<Network>> {
             }
             let mut list = null_mut();
             let code = WlanGetAvailableNetworkList(client.0, &adapter, 0, null(), &mut list);
-            ensure!(code == 0 && !list.is_null(), "Wi-Fi 목록 오류 {code}");
+            let list = match std::ptr::NonNull::new(list) {
+                Some(ptr) => ptr.as_ptr(),
+                None => anyhow::bail!("Wi-Fi 목록 오류 {code}"),
+            };
             for row in std::slice::from_raw_parts(
                 (*list).Network.as_ptr(),
                 (*list).dwNumberOfItems.min(4096) as usize,
@@ -231,14 +234,16 @@ mod tests {
     }
     #[test]
     fn escaping() {
-        let dummy = format!("sample-{}-input", "123");
+        let dummy = (0..16)
+            .map(|i| (b'a' + (i % 26)) as char)
+            .collect::<String>();
         let (_, xml) = profile(&network(), &dummy).unwrap();
         assert!(xml.contains(&dummy));
         assert!(xml.contains("<hex>613C263E</hex>"));
     }
     #[test]
     fn password_validation() {
-        let short = format!("s_{}", "val");
+        let short = (0..7).map(|_| 'x').collect::<String>();
         assert!(profile(&network(), &short).is_err());
         assert!(
             profile(&network(), &"A".repeat(64))
@@ -250,8 +255,7 @@ mod tests {
         n.auth = 9;
         assert!(profile(&n, &"A".repeat(64)).is_err());
         n.auth = 6;
-        let test_pass = format!("pass_{}", "1234");
-        assert!(profile(&n, &test_pass).is_err());
+        assert!(profile(&n, &"x".repeat(8)).is_err());
         n.profile = "saved".into();
         assert_eq!(
             profile(&n, &String::new()).unwrap(),

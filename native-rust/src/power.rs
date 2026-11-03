@@ -27,12 +27,12 @@ pub fn active() -> Result<String> {
     unsafe {
         let mut guid = null_mut();
         let code = PowerGetActiveScheme(null_mut(), &mut guid);
-        ensure!(
-            code == 0 && !guid.is_null(),
-            "Power scheme query failed: {code}"
-        );
-        let g = *guid;
-        LocalFree(guid.cast());
+        let guid_ptr = match std::ptr::NonNull::new(guid) {
+            Some(ptr) => ptr.as_ptr(),
+            None => anyhow::bail!("Power scheme query failed: {code}"),
+        };
+        let g = *guid_ptr;
+        LocalFree(guid_ptr.cast());
         Ok(format!(
             "{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
             g.data1,

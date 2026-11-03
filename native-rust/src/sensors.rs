@@ -237,48 +237,54 @@ pub fn connected_network() -> (bool, String, u32) {
         }
         let mut list = null_mut();
         let mut result: (bool, String, u32) = Default::default();
-        if WlanEnumInterfaces(h, null(), &mut list) == 0 && !list.is_null() {
-            // A disconnected (or radio-off) adapter still supports Wi-Fi.
-            // Only missing interfaces or an unavailable WLAN service hide it.
-            result.0 = (*list).dwNumberOfItems > 0;
-            for interface in std::slice::from_raw_parts(
-                (*list).InterfaceInfo.as_ptr(),
-                (*list).dwNumberOfItems as usize,
-            ) {
-                if interface.isState != wlan_interface_state_connected {
-                    continue;
-                }
-                let mut data = null_mut();
-                let mut size = 0;
-                let mut ty = 0;
-                if WlanQueryInterface(
-                    h,
-                    &interface.InterfaceGuid,
-                    wlan_intf_opcode_current_connection,
-                    null(),
-                    &mut size,
-                    &mut data,
-                    &mut ty,
-                ) == 0
-                    && !data.is_null()
-                {
-                    if size as usize >= size_of::<WLAN_CONNECTION_ATTRIBUTES>() {
-                        let a = &(*(data as *const WLAN_CONNECTION_ATTRIBUTES))
-                            .wlanAssociationAttributes;
-                        result = (
-                            true,
-                            String::from_utf8_lossy(
-                                &a.dot11Ssid.ucSSID[..(a.dot11Ssid.uSSIDLength as usize).min(32)],
-                            )
-                            .to_string(),
-                            a.wlanSignalQuality,
-                        );
+        if WlanEnumInterfaces(h, null(), &mut list) == 0 {
+            if let Some(list_ptr) = std::ptr::NonNull::new(list) {
+                let list = list_ptr.as_ptr();
+                // A disconnected (or radio-off) adapter still supports Wi-Fi.
+                // Only missing interfaces or an unavailable WLAN service hide it.
+                result.0 = (*list).dwNumberOfItems > 0;
+                for interface in std::slice::from_raw_parts(
+                    (*list).InterfaceInfo.as_ptr(),
+                    (*list).dwNumberOfItems as usize,
+                ) {
+                    if interface.isState != wlan_interface_state_connected {
+                        continue;
                     }
-                    WlanFreeMemory(data);
+                    let mut data = null_mut();
+                    let mut size = 0;
+                    let mut ty = 0;
+                    if WlanQueryInterface(
+                        h,
+                        &interface.InterfaceGuid,
+                        wlan_intf_opcode_current_connection,
+                        null(),
+                        &mut size,
+                        &mut data,
+                        &mut ty,
+                    ) == 0
+                        && !data.is_null()
+                    {
+                        let data_ptr = data as *const WLAN_CONNECTION_ATTRIBUTES;
+                        if size as usize >= size_of::<WLAN_CONNECTION_ATTRIBUTES>()
+                            && data_ptr.is_aligned()
+                        {
+                            let attr = data_ptr.read_unaligned().wlanAssociationAttributes;
+                            result = (
+                                true,
+                                String::from_utf8_lossy(
+                                    &attr.dot11Ssid.ucSSID
+                                        [..(attr.dot11Ssid.uSSIDLength as usize).min(32)],
+                                )
+                                .to_string(),
+                                attr.wlanSignalQuality,
+                            );
+                        }
+                        WlanFreeMemory(data);
+                    }
+                    break;
                 }
-                break;
+                WlanFreeMemory(list.cast());
             }
-            WlanFreeMemory(list.cast());
         }
         WlanCloseHandle(h, null());
         result
