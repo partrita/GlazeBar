@@ -20,6 +20,9 @@
 
 **GlazeBar**는 Windows 11 환경을 위한 **초경량·고성능 Rust 기반 네이티브 상태 표시줄(Top Bar)**과 **안정화 패치가 적용된 타이밍 윈도우 매니저(GlazeWM 3.10.1-glazebar.2)**를 결합한 올인원 데스크톱 환경 솔루션입니다.
 
+> 💡 **원작자 크레딧 (Original Author & Upstream)**:  
+> 본 프로젝트는 **[lamininA1/GlazeBar](https://github.com/lamininA1/GlazeBar)**의 원작을 기반으로 포크 및 발전시킨 프로젝트입니다. 훌륭한 초기 아키텍처와 아이디어를 제공해 주신 원작자 [lamininA1](https://github.com/lamininA1)님께 깊은 감사를 표합니다.
+
 기존 웹 기술(WebView2/Chromium) 기반 상태 표시줄의 높은 자원 점유율(수백 MB 메모리 소모)을 극복하기 위해, 전체 런타임을 **순수 Rust와 Win32 Direct2D 네이티브 엔진**으로 재설계했습니다. 최소한의 리소스만으로 반응 속도가 뛰어난 윈도우 관리 및 전체 데스크톱 생태계 테마 동기화 환경을 제공합니다.
 
 ---
@@ -142,6 +145,7 @@ cargo build --locked --release --target x86_64-pc-windows-msvc
 ## 📜 라이선스 및 크레딧 (License & Acknowledgments)
 
 - **GlazeBar**: [GNU General Public License v3.0 (GPL-3.0-only)](LICENSE)
+- **원작자 (Original Project)**: [lamininA1/GlazeBar](https://github.com/lamininA1/GlazeBar) by [lamininA1](https://github.com/lamininA1)
 - **포함 및 참조 프로젝트**:
   - [GlazeWM](https://github.com/glzr-io/glazewm) (GPL-3.0) — 윈도우 타일링 관리 엔진
   - [Aether](https://github.com/omacom/aether) — 지능형 팔레트 양자화 및 색상 추출 알고리즘
