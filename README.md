@@ -8,7 +8,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![Platform: Windows 11](https://img.shields.io/badge/Platform-Windows%2011%20(x64%20%7C%20ARM64)-0078d4.svg?style=flat-square&logo=windows)](https://github.com/partrita/GlazeBar)
 [![Rust: 1.80+](https://img.shields.io/badge/Rust-1.80%2B-dea584.svg?style=flat-square&logo=rust)](native-rust)
-[![CI & Release](https://img.shields.io/github/actions/workflow/status/partrita/GlazeBar/ci-release.yml?branch=main&style=flat-square&label=CI%20Build)](.github/workflows/ci-release.yml)
+[![CI & Release](https://img.shields.io/github/actions/workflow/status/partrita/GlazeBar/test.yml?branch=main&style=flat-square&label=CI%20Build)](.github/workflows/test.yml)
 
 [한국어](README.md) · [English](README.en.md)
 
