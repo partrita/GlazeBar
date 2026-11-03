@@ -1443,7 +1443,6 @@ pub fn run_with_popup(
                                             }
                                         }
                                     }
-                                    crate::online_ui::Edit::QueryChanged => {}
                                     crate::online_ui::Edit::Select(i) => {
                                         v.selected = i.min(v.rows.len().saturating_sub(1));
                                     }
@@ -1925,12 +1924,14 @@ pub fn run_with_popup(
                                                 );
                                             }
                                         }
-                                        v.status = "기본 편집기로 config.yaml 파일을 열었습니다.".into();
+                                        v.status =
+                                            "기본 편집기로 config.yaml 파일을 열었습니다.".into();
                                     }
                                     E::ReloadGlazeWM => {
                                         let _ = v.save(&root);
                                         reload_wm = true;
-                                        v.status = "설정을 저장하고 GlazeWM에 다시 적용했습니다.".into();
+                                        v.status =
+                                            "설정을 저장하고 GlazeWM에 다시 적용했습니다.".into();
                                     }
                                     E::OpenWallpaper => {
                                         let _ = v.save(&root);
@@ -1940,15 +1941,13 @@ pub fn run_with_popup(
                                         let _ = v.save(&root);
                                         next_control = Some("Sheet");
                                     }
-                                    E::Save => {
-                                        match v.save(&root) {
-                                            Ok(()) => {
-                                                reload_wm = true;
-                                                close_settings = true;
-                                            }
-                                            Err(e) => v.status = e.to_string(),
+                                    E::Save => match v.save(&root) {
+                                        Ok(()) => {
+                                            reload_wm = true;
+                                            close_settings = true;
                                         }
-                                    }
+                                        Err(e) => v.status = e.to_string(),
+                                    },
                                     other => {
                                         v.apply_edit(other);
                                         let _ = v.save(&root);

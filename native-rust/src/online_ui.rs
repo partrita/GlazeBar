@@ -17,7 +17,6 @@ use std::{
 pub enum Edit {
     Tab(Mode),
     Heart,
-    QueryChanged,
     Refresh,
     Search(bool),
     Page(i32),

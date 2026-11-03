@@ -250,7 +250,9 @@ impl Plan {
                 || path.exists()
                 || code_dir.exists()
                 || home.join(".vscode").exists()
-                || home.join("AppData/Local/Programs/Microsoft VS Code").exists();
+                || home
+                    .join("AppData/Local/Programs/Microsoft VS Code")
+                    .exists();
             if !installed {
                 plan.skipped.push("vscode".into());
             } else {
@@ -971,8 +973,14 @@ mod tests {
         assert!(plan.skipped.contains(&"hyper".to_owned()));
         assert!(plan.skipped.contains(&"putty".to_owned()));
         plan.apply_with(|_| Ok(())).unwrap();
-        assert!(home.join("AppData/Local/rio/themes/glazebar-aether.toml").exists());
-        assert!(home.join("AppData/Roaming/Zed/themes/glazebar-aether.json").exists());
+        assert!(
+            home.join("AppData/Local/rio/themes/glazebar-aether.toml")
+                .exists()
+        );
+        assert!(
+            home.join("AppData/Roaming/Zed/themes/glazebar-aether.json")
+                .exists()
+        );
     }
     #[test]
     fn installed_new_targets_are_updated_and_restored() {
@@ -981,7 +989,10 @@ mod tests {
         fs::create_dir_all(home.join(".gemini/antigravity-cli")).unwrap();
         fs::create_dir_all(home.join(".claude")).unwrap();
         fs::create_dir_all(home.join(".config/opencode")).unwrap();
-        fs::create_dir_all(home.join("AppData/Roaming/Mozilla/Firefox/Profiles/abc.default-release")).unwrap();
+        fs::create_dir_all(
+            home.join("AppData/Roaming/Mozilla/Firefox/Profiles/abc.default-release"),
+        )
+        .unwrap();
         fs::create_dir_all(home.join(".config/wezterm")).unwrap();
         fs::create_dir_all(home.join("AppData/Roaming/alacritty")).unwrap();
         fs::create_dir_all(home.join("AppData/Roaming/Hyper")).unwrap();
@@ -1025,22 +1036,48 @@ mod tests {
         plan.apply_with(|_| Ok(())).unwrap();
         assert!(home.join(".gemini/antigravity-cli/settings.json").exists());
         assert!(home.join(".claude/settings.json").exists());
-        assert!(home.join(".config/opencode/themes/glazebar-aether.json").exists());
         assert!(
-            home.join("AppData/Roaming/Mozilla/Firefox/Profiles/abc.default-release/chrome/userChrome.css")
+            home.join(".config/opencode/themes/glazebar-aether.json")
                 .exists()
         );
-        assert!(home.join(".config/wezterm/colors/glazebar-aether.toml").exists());
+        assert!(
+            home.join(
+                "AppData/Roaming/Mozilla/Firefox/Profiles/abc.default-release/chrome/userChrome.css"
+            )
+            .exists()
+        );
+        assert!(
+            home.join(".config/wezterm/colors/glazebar-aether.toml")
+                .exists()
+        );
         assert!(home.join(".config/wezterm/wezterm.lua").exists());
-        assert!(home.join("AppData/Roaming/alacritty/alacritty.toml").exists());
+        assert!(
+            home.join("AppData/Roaming/alacritty/alacritty.toml")
+                .exists()
+        );
         assert!(home.join("AppData/Roaming/Hyper/.hyper.js").exists());
-        assert!(home.join("AppData/Roaming/PuTTY/glazebar-aether.reg").exists());
+        assert!(
+            home.join("AppData/Roaming/PuTTY/glazebar-aether.reg")
+                .exists()
+        );
         restore_with(home, |_| Ok(())).unwrap();
-        assert!(!home.join(".config/opencode/themes/glazebar-aether.json").exists());
+        assert!(
+            !home
+                .join(".config/opencode/themes/glazebar-aether.json")
+                .exists()
+        );
         assert!(!home.join(".config/wezterm/wezterm.lua").exists());
-        assert!(!home.join("AppData/Roaming/alacritty/alacritty.toml").exists());
+        assert!(
+            !home
+                .join("AppData/Roaming/alacritty/alacritty.toml")
+                .exists()
+        );
         assert!(!home.join("AppData/Roaming/Hyper/.hyper.js").exists());
-        assert!(!home.join("AppData/Roaming/PuTTY/glazebar-aether.reg").exists());
+        assert!(
+            !home
+                .join("AppData/Roaming/PuTTY/glazebar-aether.reg")
+                .exists()
+        );
     }
     #[test]
     fn apply_restore_preserves_bytes_and_removes_created_files() {

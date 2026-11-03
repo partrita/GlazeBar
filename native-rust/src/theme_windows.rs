@@ -497,8 +497,14 @@ mod tests {
                 .iter()
                 .all(|c| valid(&c.registry_key, &c.registry_name))
         );
-        assert!(!valid(r"Software\SimonTatham\PuTTY\Sessions\Default%20Settings", "HostName"));
-        assert!(!valid(r"Software\SimonTatham\PuTTY\Sessions\Default%20Settings\Sub", "Colour0"));
+        assert!(!valid(
+            r"Software\SimonTatham\PuTTY\Sessions\Default%20Settings",
+            "HostName"
+        ));
+        assert!(!valid(
+            r"Software\SimonTatham\PuTTY\Sessions\Default%20Settings\Sub",
+            "Colour0"
+        ));
     }
     #[test]
     fn taskbar_requires_known_dark_mode_unless_mode_is_selected() {

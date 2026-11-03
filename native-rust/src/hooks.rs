@@ -157,10 +157,17 @@ unsafe extern "system" fn foreground(
     });
 }
 unsafe extern "system" fn mouse(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    if code >= 0 && matches!(wp as u32, WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN) {
+    if code >= 0
+        && matches!(
+            wp as u32,
+            WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN
+        )
+    {
         CONTEXT.with(|slot| {
             if let Some(c) = slot.borrow().as_ref() {
-                c.emit(Event::PointerDown(unsafe { (*(lp as *const MSLLHOOKSTRUCT)).pt }));
+                c.emit(Event::PointerDown(unsafe {
+                    (*(lp as *const MSLLHOOKSTRUCT)).pt
+                }));
             }
         });
     }
@@ -231,8 +238,17 @@ impl Hooks {
                 "Cannot install keyboard hook: {}",
                 GetLastError()
             );
-            hooks.mouse = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), GetModuleHandleW(std::ptr::null()), 0);
-            ensure!(!hooks.mouse.is_null(), "Cannot install mouse hook: {}", GetLastError());
+            hooks.mouse = SetWindowsHookExW(
+                WH_MOUSE_LL,
+                Some(mouse),
+                GetModuleHandleW(std::ptr::null()),
+                0,
+            );
+            ensure!(
+                !hooks.mouse.is_null(),
+                "Cannot install mouse hook: {}",
+                GetLastError()
+            );
             hooks.foreground = SetWinEventHook(
                 EVENT_SYSTEM_FOREGROUND,
                 EVENT_SYSTEM_FOREGROUND,

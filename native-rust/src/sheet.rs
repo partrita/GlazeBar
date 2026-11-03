@@ -122,7 +122,12 @@ pub fn paint(c: &mut Canvas, s: &Sheet, hover: Option<(i32, i32)>) -> Vec<Hit> {
             c.frame(banner, ui.accent);
             c.text(
                 "핵심 단축키 요약 (Quick Start)",
-                Rect::new(banner.x + c.p(16.), banner.y + c.p(8.), banner.w - c.p(32.), c.p(24.)),
+                Rect::new(
+                    banner.x + c.p(16.),
+                    banner.y + c.p(8.),
+                    banner.w - c.p(32.),
+                    c.p(24.),
+                ),
                 ui.accent,
                 12.5,
                 true,
@@ -139,12 +144,7 @@ pub fn paint(c: &mut Canvas, s: &Sheet, hover: Option<(i32, i32)>) -> Vec<Hit> {
                 c.text(key, key_rect, ui.text, 11.5, true, 1);
                 c.text(
                     desc,
-                    Rect::new(
-                        rx + c.p(175.),
-                        ry,
-                        col_w - c.p(182.),
-                        c.p(26.),
-                    ),
+                    Rect::new(rx + c.p(175.), ry, col_w - c.p(182.), c.p(26.)),
                     ui.text,
                     12.,
                     false,
@@ -222,7 +222,11 @@ mod tests {
 
         let template = include_str!("../../distribution/templates/cheatsheet.tsv");
         let parsed = Sheet::parse(template);
-        let expected_rows = template.lines().skip(1).filter(|l| !l.trim().is_empty()).count();
+        let expected_rows = template
+            .lines()
+            .skip(1)
+            .filter(|l| !l.trim().is_empty())
+            .count();
         assert_eq!(parsed.rows.len(), expected_rows);
     }
 }

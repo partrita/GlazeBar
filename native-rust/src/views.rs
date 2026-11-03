@@ -383,7 +383,11 @@ pub fn bar_with_settings(
         );
         hit(&mut hits, sr, Action::Scale);
     }
-    let br_right = if settings.show_scale { sr.x } else { dx - c.p(12.) };
+    let br_right = if settings.show_scale {
+        sr.x
+    } else {
+        dx - c.p(12.)
+    };
     let br = Rect::new(br_right - c.p(162.), 0, c.p(150.), h);
     if settings.show_brightness && br.x > left {
         paint_brightness(c, br, brightness);

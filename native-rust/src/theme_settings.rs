@@ -445,7 +445,12 @@ mod tests {
         let opencode = opencode_settings("{\"model\": \"claude\"}", "glazebar-aether").unwrap();
         assert!(opencode.contains("\"theme\": \"glazebar-aether\""));
 
-        let chrome = chromium_preferences("{\"browser\": {\"check_default_browser\": false}}", &p, false).unwrap();
+        let chrome = chromium_preferences(
+            "{\"browser\": {\"check_default_browser\": false}}",
+            &p,
+            false,
+        )
+        .unwrap();
         let parsed = Document::new(&chrome).unwrap().parse().unwrap();
         assert_eq!(
             parsed

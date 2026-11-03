@@ -182,7 +182,8 @@ impl BarSettings {
         if let Ok(source) = std::fs::read_to_string(&config_path) {
             let mut updated = source.clone();
             if let Some((_, cmd)) = TERMINALS.get(self.terminal_idx) {
-                updated = crate::theme_text::glazewm_set_binding_command(&updated, "alt+enter", cmd);
+                updated =
+                    crate::theme_text::glazewm_set_binding_command(&updated, "alt+enter", cmd);
             }
             if let Some((_, cmd)) = BROWSERS.get(self.browser_idx) {
                 updated = crate::theme_text::glazewm_set_binding_command(
@@ -235,14 +236,7 @@ impl BarSettings {
     }
 }
 
-fn toggle(
-    c: &mut Canvas,
-    hits: &mut Vec<Hit>,
-    label: &str,
-    r: Rect,
-    checked: bool,
-    edit: Edit,
-) {
+fn toggle(c: &mut Canvas, hits: &mut Vec<Hit>, label: &str, r: Rect, checked: bool, edit: Edit) {
     let side = c.p(11.);
     let y = r.y + (r.h - side) / 2;
     let col = if checked { c.ui.accent } else { c.ui.border };
@@ -336,9 +330,17 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         ("메모리 사용률", v.show_memory, Edit::ToggleMemory),
         ("배터리 / 전력", v.show_battery, Edit::ToggleBattery),
         ("Wi-Fi 네트워크", v.show_wifi, Edit::ToggleWifi),
-        ("화면 밝기 슬라이더", v.show_brightness, Edit::ToggleBrightness),
+        (
+            "화면 밝기 슬라이더",
+            v.show_brightness,
+            Edit::ToggleBrightness,
+        ),
         ("디스플레이 배율", v.show_scale, Edit::ToggleScale),
-        ("빠른 실행 버튼", v.show_quick_buttons, Edit::ToggleQuickButtons),
+        (
+            "빠른 실행 버튼",
+            v.show_quick_buttons,
+            Edit::ToggleQuickButtons,
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -476,7 +478,13 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
 
     // Bottom quick actions
     for (label, x, width, selected, edit) in [
-        ("테마 · 배경화면 열기", 24., 160., false, Edit::OpenWallpaper),
+        (
+            "테마 · 배경화면 열기",
+            24.,
+            160.,
+            false,
+            Edit::OpenWallpaper,
+        ),
         ("단축키 안내 보기", 194., 145., false, Edit::OpenSheet),
         ("config.yaml 직접 편집", 349., 165., false, Edit::OpenConfig),
         ("GlazeWM 재적용", 524., 135., false, Edit::ReloadGlazeWM),

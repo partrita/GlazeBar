@@ -112,7 +112,10 @@ impl Client {
         let sig = format!("{}:{}:{}", string(f, "id"), f["width"], f["height"]);
         // Native minimize/restore animations can deliver intermediate focus
         // events. Do not turn those transient targets into new split nodes.
-        if self.group_settle_until.is_some_and(|until| std::time::Instant::now() < until) {
+        if self
+            .group_settle_until
+            .is_some_and(|until| std::time::Instant::now() < until)
+        {
             self.auto_signature = sig;
             return Ok(());
         }
@@ -145,7 +148,10 @@ impl Client {
         bail!("Window state timed out: {id}")
     }
     pub fn restore_group(&mut self, root: &std::path::Path) -> Result<()> {
-        if self.request("query app-metadata")?["version"].as_str().is_some_and(|v| v.contains("-glazebar.")) {
+        if self.request("query app-metadata")?["version"]
+            .as_str()
+            .is_some_and(|v| v.contains("-glazebar."))
+        {
             self.request("command wm-restore-minimized-group")?;
             self.group_settle_until = Some(std::time::Instant::now() + Duration::from_secs(2));
             let data = self.request("query focused")?;
@@ -181,7 +187,10 @@ impl Client {
         if self.request("query paused")? == true {
             return Ok(());
         }
-        if self.request("query app-metadata")?["version"].as_str().is_some_and(|v| v.contains("-glazebar.")) {
+        if self.request("query app-metadata")?["version"]
+            .as_str()
+            .is_some_and(|v| v.contains("-glazebar."))
+        {
             self.request("command wm-toggle-minimized-group")?;
             self.group_settle_until = Some(std::time::Instant::now() + Duration::from_secs(2));
             let data = self.request("query focused")?;

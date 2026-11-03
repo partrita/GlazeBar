@@ -434,8 +434,16 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 ScreenToClient(h, &mut pos);
                 let mut r = RECT::default();
                 GetClientRect(h, &mut r);
-                let right_margin = if matches!(s.scene, Scene::Sheet(_)) { 276. } else { 110. };
-                let top_margin = if matches!(s.scene, Scene::Sheet(_)) { 94. } else { 68. };
+                let right_margin = if matches!(s.scene, Scene::Sheet(_)) {
+                    276.
+                } else {
+                    110.
+                };
+                let top_margin = if matches!(s.scene, Scene::Sheet(_)) {
+                    94.
+                } else {
+                    68.
+                };
                 if pos.y < (top_margin * s.scale).round_ties_even() as i32
                     && pos.x < r.right - (right_margin * s.scale).round_ties_even() as i32
                 {

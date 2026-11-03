@@ -438,9 +438,7 @@ return config{newline}"
         );
     }
     if source.contains(LUA_START) && source.contains(LUA_END) {
-        let block = format!(
-            "{LUA_START}\nconfig.color_scheme = \"{scheme_name}\"\n{LUA_END}\n"
-        );
+        let block = format!("{LUA_START}\nconfig.color_scheme = \"{scheme_name}\"\n{LUA_END}\n");
         return replace_delimited_block_with(source, LUA_START, LUA_END, &block);
     }
     let mut lines: Vec<String> = source.split_inclusive('\n').map(str::to_owned).collect();
@@ -469,10 +467,9 @@ return config{newline}"
             }
         }
     }
-    if let Some(pos) = lines
-        .iter()
-        .rposition(|l| l.trim_start().starts_with("return ") && !l.trim_start().starts_with("return {"))
-    {
+    if let Some(pos) = lines.iter().rposition(|l| {
+        l.trim_start().starts_with("return ") && !l.trim_start().starts_with("return {")
+    }) {
         let block = format!(
             "{LUA_START}{newline}config.color_scheme = \"{scheme_name}\"{newline}{LUA_END}{newline}"
         );
@@ -489,9 +486,7 @@ return config{newline}"
         );
         return lines.concat();
     }
-    let block = format!(
-        "{LUA_START}\nconfig.color_scheme = \"{scheme_name}\"\n{LUA_END}\n"
-    );
+    let block = format!("{LUA_START}\nconfig.color_scheme = \"{scheme_name}\"\n{LUA_END}\n");
     replace_delimited_block_with(source, LUA_START, LUA_END, &block)
 }
 
@@ -752,7 +747,9 @@ mod tests {
         assert_eq!(cols.len(), 22);
         assert_eq!(cols[0], ("Colour0", "18,52,86".to_owned()));
         let reg = putty_reg("Default%20Settings", &p);
-        assert!(reg.contains("[HKEY_CURRENT_USER\\Software\\SimonTatham\\PuTTY\\Sessions\\Default%20Settings]"));
+        assert!(reg.contains(
+            "[HKEY_CURRENT_USER\\Software\\SimonTatham\\PuTTY\\Sessions\\Default%20Settings]"
+        ));
         assert!(reg.contains("\"Colour0\"=\"18,52,86\""));
         assert!(reg.contains("\"Colour21\"=\"18,52,86\""));
     }

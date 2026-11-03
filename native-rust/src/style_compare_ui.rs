@@ -110,8 +110,20 @@ pub fn paint(c: &mut Canvas, v: &Comparison, hover: Option<(i32, i32)>) -> Vec<H
             v.presets,
             Action::Compare(Edit::Presets(true)),
         ),
-        ("다크", 260., 72., !v.light, Action::Compare(Edit::Light(false))),
-        ("라이트", 180., 72., v.light, Action::Compare(Edit::Light(true))),
+        (
+            "다크",
+            260.,
+            72.,
+            !v.light,
+            Action::Compare(Edit::Light(false)),
+        ),
+        (
+            "라이트",
+            180.,
+            72.,
+            v.light,
+            Action::Compare(Edit::Light(true)),
+        ),
         ("닫기", 92., 72., false, Action::Close),
     ] {
         let r = Rect::new(c.width - s(right), s(18.), s(width), s(30.));

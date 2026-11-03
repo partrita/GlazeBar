@@ -86,10 +86,11 @@ impl Worker {
             p.palette = None;
         }
         let image = if p.enabled {
-            p.files
-                .get(p.selected)
-                .cloned()
-                .or_else(|| crate::color_schemes::find(mode).is_some().then(PathBuf::new))
+            p.files.get(p.selected).cloned().or_else(|| {
+                crate::color_schemes::find(mode)
+                    .is_some()
+                    .then(PathBuf::new)
+            })
         } else {
             None
         };
