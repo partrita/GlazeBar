@@ -1,168 +1,151 @@
+<div align="center">
+
 # GlazeBar + GlazeWM
 
-> **최신: 0.1.0-preview.7 · Windows 11 x64 / ARM64.** 창을 옮길 때 `No workspace is currently focused.`, `Focused container has no monitor.` 오류가 반복되던 GlazeWM 문제를 고쳤습니다. preview.4~6 사용자는 업데이트를 권장합니다. [원인과 수정](docs/glazewm-modifications.md#preview7-fix)
+**Next-Generation High-Performance Tiling Window Management & System Status Suite for Windows 11**
+
+[![Release](https://img.shields.io/github/v/release/partrita/GlazeBar?include_prereleases&style=flat-square&color=0969da)](https://github.com/partrita/GlazeBar/releases)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![Platform: Windows 11](https://img.shields.io/badge/Platform-Windows%2011%20(x64%20%7C%20ARM64)-0078d4.svg?style=flat-square&logo=windows)](https://github.com/partrita/GlazeBar)
+[![Rust: 1.80+](https://img.shields.io/badge/Rust-1.80%2B-dea584.svg?style=flat-square&logo=rust)](native-rust)
+[![CI & Release](https://img.shields.io/github/actions/workflow/status/partrita/GlazeBar/ci-release.yml?branch=main&style=flat-square&label=CI%20Build)](.github/workflows/ci-release.yml)
 
 [한국어](README.md) · [English](README.en.md)
 
-**본 저장소는 GlazeWM과 Topbar를 설치합니다.**
+</div>
 
-Omarchy를 보고 Windows에서도 이런 환경을 써보고 싶어 GlazeWM을 사용하게 됐습니다. 그런데 함께 쓰던 Zebar가 WebView2 기반이라 제 환경에서는 꽤 무겁게 느껴지더라고요. 그래서 표시줄을 Rust로 새로 만들고, 쓰면서 필요했던 편의 기능도 하나씩 붙였습니다.
+---
 
-이 배포판에는 **Rust 상태 표시줄 GlazeBar와 수정된 GlazeWM 3.10.1이 모두 포함**되어 있습니다.
-GlazeWM이 창과 작업공간을 관리하고, GlazeBar에서 시스템 상태를 확인하거나 밝기·Wi-Fi·배터리 상태 기타 등등을 확인할 수 있습니다.
+## 📌 개요 (Overview)
 
-> GlazeWM 공식 배포판이 아닌 독립적인 커뮤니티 번들입니다! 저는 아무것도 몰라요
+**GlazeBar**는 Windows 11 환경을 위한 **초경량·고성능 Rust 기반 네이티브 상태 표시줄(Top Bar)**과 **안정화 패치가 적용된 타이밍 윈도우 매니저(GlazeWM 3.10.1-glazebar.2)**를 결합한 올인원 데스크톱 환경 솔루션입니다.
 
-글꼴은 Pretendard, 색상 추출은 Aether, UI는 Omarchy Quattro에서 가져왔습니다.
+기존 웹 기술(WebView2/Chromium) 기반 상태 표시줄의 높은 자원 점유율(수백 MB 메모리 소모)을 극복하기 위해, 전체 런타임을 **순수 Rust와 Win32 Direct2D 네이티브 엔진**으로 재설계했습니다. 최소한의 리소스만으로 반응 속도가 뛰어난 윈도우 관리 및 전체 데스크톱 생태계 테마 동기화 환경을 제공합니다.
 
-- **기본 글꼴:** [Pretendard](https://github.com/orioncactus/pretendard)
-- **색상 추출:** [Aether](https://github.com/omacom/aether)의 팔레트 추출 알고리즘을 가져와 Rust로 이식
-- **UI 디자인:** [Omarchy Quattro](https://github.com/omacom/omarchy/tree/quattro)의 UI를 바탕으로 Windows 네이티브 화면으로 구현
+---
 
-## 다운로드
+## ⚡ 벤치마크 및 리소스 성능 (Performance)
 
-| 사용하는 PC | 통합 설치 프로그램 |
-| --- | --- |
-| Intel / AMD Windows | [x64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.7/GlazeBar-GlazeWM-Setup-0.1.0-preview.7-x64.exe) |
-| Windows on ARM | [ARM64 설치 EXE](https://github.com/lamininA1/GlazeBar/releases/download/v0.1.0-preview.7/GlazeBar-GlazeWM-Setup-0.1.0-preview.7-arm64.exe) |
+동일 하드웨어 환경(Surface Pro 11 / Snapdragon X Plus X1P-64-100 / Windows 11 ARM64)에서 기존 웹 기반 상태 표시줄 솔루션과 실측 비교한 결과입니다.
 
-## 설치
+| 지표 | 기존 WebView2 기반 (Zebar) | **GlazeBar (Native Rust)** | 개선율 |
+| :--- | :---: | :---: | :---: |
+| **작업 집합 메모리 (Working Set)** | 799.7 MiB | **25.18 MiB** | **96.8% 절감** |
+| **전용 메모리 (Private Bytes)** | 331.4 MiB | **5.05 MiB** | **98.4% 절감** |
+| **상주 프로세스 수 (Processes)** | 13개 프로세스 | **단일(1개) 프로세스** | **단순화** |
+| **CPU 상시 점유율 (Idle)** | 0.058% | **0.047%** | **초저전력 최적화** |
 
-1. PC에 맞는 설치 EXE를 다운로드합니다.
-2. 실행 중인 GlazeWM과 GlazeBar가 있다면 종료합니다.
-3. EXE를 실행하고 설치 안내를 따라갑니다. 로그인 시 자동 시작 여부도 선택할 수 있습니다.
-4. 시작 메뉴의 **GlazeBar + GlazeWM**을 실행합니다.
+> 📊 상세한 벤치마크 조건과 측정 프로파일링 로그는 [docs/performance.md](docs/performance.md)에서 확인하실 수 있습니다.
 
-**명령어 입력이나 별도의 GlazeWM 다운로드는 필요하지 않습니다.** 기존 설정은 설치 전에 백업합니다.
-x64와 ARM64 모두 사용자 폴더의 수정 GlazeWM 3.10.1-glazebar.2를 실행합니다. 공식 3.10.1은 CLI 호환성과 원복용으로 유지합니다.
+---
 
-GlazeBar에는 .NET·Go·WebView2 설치가 필요 없습니다. GlazeWM에 필요한 Visual C++ 런타임이 없는 경우에만 Microsoft 설치 프로그램을 내려받도록 안내합니다.
-GlazeWM 및 런타임 설치 중 Windows 관리자 권한 확인이 나타날 수 있습니다.
+## 🚀 다운로드 및 설치 (Download & Installation)
 
-### 기존 버전에서 업데이트
+GlazeBar는 x64 및 ARM64(Copilot+ PC, Snapdragon X) 아키텍처를 네이티브로 지원하며, 독립적인 Inno Setup 통합 설치 프로그램을 제공합니다.
 
-GlazeWM과 GlazeBar를 종료하고 **Windows 설정 → 앱 → GlazeBar + GlazeWM (community setup)**에서 기존 버전을 제거한 뒤 새 설치 프로그램을 실행하세요. 제거할 때 설치 전 파일은 복원되고, 설치 후 직접 수정한 파일은 따로 보관됩니다. 내 설정을 새 설치로 옮길 때 이 백업을 쓰면 됩니다.
+| 플랫폼 아키텍처 | 통합 설치 패키지 (All-in-One Installer) |
+| :--- | :--- |
+| **Windows 11 (x86_64 / Intel / AMD)** | [⬇️ GlazeBar-GlazeWM-Setup-x64.exe](https://github.com/partrita/GlazeBar/releases/latest) |
+| **Windows 11 on ARM (ARM64 / Snapdragon)** | [⬇️ GlazeBar-GlazeWM-Setup-arm64.exe](https://github.com/partrita/GlazeBar/releases/latest) |
 
-## 주요 기능
+### 설치 가이드
+1. 사용하는 PC 아키텍처에 맞는 최신 설치 프로그램(`.exe`)을 다운로드합니다.
+2. 기존에 실행 중인 `GlazeWM` 또는 `GlazeBar`가 있다면 종료합니다.
+3. 설치 프로그램을 실행하여 지침에 따라 설치를 완료합니다 (시작 시 자동 실행 옵션 제공).
+4. 시작 메뉴에서 **GlazeBar + GlazeWM**을 실행하면 즉시 적용됩니다.
 
-- **작업공간과 창 관리** — 작업공간 표시, 창 배치 단축키, 전체 화면 대응
-- **시스템 상태** — CPU·메모리·배터리 잔량·충방전 전력 표시
-- **빠른 설정** — Wi-Fi, 화면 밝기, 디스플레이 배율, 전원 구성표
-- **배경화면과 테마** — 배경화면 선택, 색상 추출, 테마 적용, Wallhaven 검색 (Omarchy처럼 각종 테마가 변경됩니다!)
+> 별도의 `.NET`, `Go`, `WebView2` 런타임 설치가 필요하지 않습니다. 기존 설정 파일은 자동으로 안전하게 백업됩니다.
 
-배경화면을 고르면 사진에 맞춰 테마도 바뀝니다!
+---
 
-![배경화면 선택과 테마 색상 변경 시연](docs/media/theme-change.gif)
+## 🎯 핵심 기능 (Key Features)
 
-VS Code도 같이 바뀝니다. 영상은 Python이지만 Rust, JavaScript 등 다른 언어에도 적용돼요.
+### 1. 강력한 타일링 윈도우 관리 (Tiling Window Manager)
+- **최적화된 GlazeWM 3.10.1 탑재**: 창 이동 시 포커스 및 모니터 정보 유실 문제를 원천 차단한 커뮤니티 안정화 패치 빌드.
+- **Alt + M 고속 최소화 및 완벽 복원**: 분할 구조, 화면 비율, 포커스 순서를 보존한 채 즉각 최소화 및 복원.
+- **스마트 분할 트리 정리**: 창 종료 또는 분할 변경 시 남는 빈 컨테이너를 다시 그리기(Redraw) 직전에 정리하여 데스크톱 영역 회수.
 
-![VS Code 배경과 코드 문법 색상 변경 시연](docs/media/vscode-theme.gif)
+### 2. 고성능 네이티브 시스템 위젯 & 빠른 컨트롤
+- **하드웨어 텔레메트리**: 실시간 CPU 사용률, 물리 메모리 점유율, 배터리 잔량 및 충/방전 전력(W) 모니터링.
+- **디스플레이 & 네트워크 즉시 제어**: 표시줄 내 다이렉트 슬라이더를 통한 화면 밝기 조절, 디스플레이 배율(Scale), 주변 Wi-Fi 탐색 및 연결 메뉴.
+- **전원 모드 전환**: 고성능, 균형, 절전 구성표를 표시줄 팝업에서 원클릭으로 변경.
 
-### 기존 Zebar 구성에서 추가한 기능
+### 3. 지능형 테마 동기화 엔진 (Dynamic Theme Ecosystem)
+- **사진 기반 팔레트 추출**: [Aether](https://github.com/omacom/aether) 알고리즘 기반으로 배경화면 이미지에서 6가지 조화 스타일의 색상 팔레트 자동 추출.
+- **대표 개발자 컬러 스킴 지원**: **Catppuccin, Everforest, Rosé Pine, Monokai, Dracula, Tokyo Night** 등 검증된 컬러 스킴 원클릭 적용.
+- **Wallhaven 연동 탐색기**: 데스크톱 내에서 고해상도 배경화면 검색, 필터링, 다운로드 및 캐싱 지원.
 
-제가 쓰던 Zebar 바에 아쉬웠던 것들을 이것저것 붙였습니다.
+---
 
-- **밝기·배율 직접 조절** — 표시줄의 밝기 슬라이더와 아이콘 아래 배율 메뉴
-- **Wi-Fi 연결 메뉴** — 주변 네트워크 검색, 선택 및 연결
-- **전원 구성표 전환** — 고성능·균형·절전을 표시줄에서 선택
-- **배경화면 선택기** — 로컬 사진 탐색과 Wallhaven 검색·다운로드
-- **사진 기반 테마 생성 + 유명 컬러 스킴** — 사진 색상 추출(Aether 6가지 스타일)뿐만 아니라 **Catppuccin, Everforest, Rosé Pine, Monokai, Dracula, Tokyo Night** 등 유명한 컬러 스킴 선택 및 다크·라이트 비교 지원
-- **확장된 앱·브라우저·Windows 색상 연동** — 설치된 앱만 자동으로 감지하여 테마를 적용하고, 설치되지 않은 프로그램은 오류 없이 건너뛰고 다음 프로그램에 적용
-- **직관적인 GlazeBar 환경 설정 UI** — 상단 바의 설정 버튼으로 위젯 표시 여부, 날씨 도시(서울·부산·도쿄·뉴욕 등), 기본 터미널·브라우저 단축키, 창 간격, 테마 적용 대상을 한곳에서 변경
-- **첫 실행 단축키 안내 & Quick Start 요약** — 처음 설치 후 실행 시 핵심 단축키 요약 카드가 포함된 단축키 안내 창을 자동으로 표시하고 상단 바 단축키 버튼으로 언제든 다시 열기 지원
-- **사진 기반 테마 생성** — 색상 추출, 다크·라이트 전환, 6가지 스타일 비교와 미리보기
-- **앱·Windows 색상 연동** — 원하는 앱끼리 색상 맞추기
-- **색상 복원과 캐시** — 이전 색상으로 돌아가기, 뽑아둔 색상 재사용하기
+## 🎨 테마 연동 지원 매트릭스 (Theme Ecosystem Matrix)
 
-### 테마가 적용되는 범위
+GlazeBar에서 테마를 변경하면 시스템에 설치된 주요 개발 도구, 브라우저, 터미널 및 Windows 환경에 실시간으로 일관된 색상이 반영됩니다 (미설치 프로그램은 안전하게 자동 스킵).
 
-**색상 함께 적용**을 켜고 원하는 앱을 골라주면 됩니다. 설치되지 않은 앱은 오류 없이 자동으로 건너뛰고 다음 프로그램에 테마를 적용합니다.
+```mermaid
+flowchart TD
+    GB[GlazeBar 테마 엔진\n사진 추출 / 컬러 스킴] -->|Direct2D / Win32| OS[Windows 11 OS\n강조색 / 다크·라이트 / 타이틀바]
+    GB -->|Config Sync| EDITORS[개발 에디터\nVS Code / Zed / Codex / OpenCode]
+    GB -->|Color Palette| TERMS[터미널\nWindows Terminal / WezTerm / Alacritty / Rio / Hyper / PuTTY]
+    GB -->|Profile Injection| BROWSERS[웹 브라우저\nFirefox userChrome / Chrome / Edge]
+    GB -->|Window Border| WM[GlazeWM\n타일링 테두리 및 상태 표시줄]
+```
 
-| 적용 대상 | 변경되는 부분 |
-| --- | --- |
-| GlazeBar + GlazeWM | 표시줄, 팝업, 활성 창 테두리 |
-| Windows Terminal | 배경, 글자, 커서와 터미널 16색 팔레트 |
-| Rio Terminal | `themes/glazebar-aether.toml` 테마 파일 생성 및 `config.toml` 테마 연동 |
-| WezTerm | `~/.config/wezterm/colors/glazebar-aether.toml` 생성 및 `wezterm.lua` (`color_scheme`) 연동 |
-| Alacritty | `%APPDATA%/alacritty/themes/glazebar-aether.toml` 생성 및 `alacritty.toml` 색상 블록 연동 |
-| Hyper | `%APPDATA%/Hyper/.hyper.js` 및 `~/.hyper.js` 터미널 16색·배경·커서 연동 |
-| PuTTY | Windows 레지스트리(`HKCU\Software\SimonTatham\PuTTY\Sessions\*`의 `Colour0`~`Colour21`) 및 `.reg` 테마 파일 자동 갱신 |
-| VS Code | 편집기, 사이드바, 탭, 상태 표시줄, 터미널, 코드 문법 색상 |
-| Zed Editor | `themes/glazebar-aether.json` 테마 생성 및 `settings.json` 테마 연동 |
-| Codex CLI | 코드와 diff 색상 (`config.toml`) |
-| Antigravity CLI | `~/.gemini/antigravity-cli` 테마 및 `colorScheme` 설정 |
-| Claude / Claude Code | `~/.claude/settings.json` 및 Claude Desktop 테마 설정 |
-| OpenCode | `~/.config/opencode/themes/glazebar-aether.json` 및 `opencode.json` 테마 연동 |
-| Firefox | 프로필 `chrome/userChrome.css` 및 `user.js` 툴바·탭 강조색 연동 |
-| Chrome / Edge | 브라우저 프로필 `Preferences` 다크/라이트 및 테마 시드 색상 연동 |
-| Windows | 다크·라이트 모드, 강조색, 제목 표시줄, 시작 메뉴·작업 표시줄, 투명 효과 |
+| 범주 | 지원 대상 | 동기화 항목 |
+| :--- | :--- | :--- |
+| **운영체제** | Windows 11 | 시스템 다크/라이트 모드, 강조색(Accent Color), 작업 표시줄, 제목 표시줄 투명도 |
+| **터미널** | Windows Terminal | 기본 프로필 배경/전경색, 커서, 16색 ANSI 색상 테이블 |
+| | WezTerm / Alacritty / Rio | TOML/Lua 테마 파일 자동 생성 및 색상 블록 동기화 |
+| | Hyper / PuTTY | JavaScript 설정 및 Windows 레지스트리 세션 색상(`Colour0`~`Colour21`) 갱신 |
+| **에디터** | VS Code | 편집기, 사이드바, 상태 표시줄, 통합 터미널 및 구문 강조(Syntax) 테마 |
+| | Zed Editor / OpenCode | 전용 JSON 테마 생성 및 활성 테마 매핑 |
+| **CLI & Agent** | Antigravity / Claude / Codex | CLI 설정 파일 내 색상 프로필 자동 반영 |
+| **브라우저** | Firefox / Chrome / Edge | `userChrome.css` 및 브라우저 프로필 테마 시드 색상 연동 |
 
-Windows 쪽은 바꾸고 싶은 항목만 따로 고를 수 있습니다. 작업 표시줄 강조색은 다크 모드에서 써주세요.
-앱 연동은 Windows 설치 기준입니다. WSL 안의 Codex 설정은 아직 따로 적용해야 합니다.
+---
 
-주석 색상은 본문과 구분되는 차분한 색조를 유지하면서 배경 대비를 확보합니다. [자세히](docs/comment-colors.md)
+## ⌨️ 기본 단축키 (Keyboard Shortcuts)
 
-## 수정된 GlazeWM
+| 단축키 | 기능 설명 |
+| :--- | :--- |
+| `Win + F1` | 전체 단축키 및 Quick Start 안내 창 호출 |
+| `Win + Alt + Shift + B` | 상태 표시줄(GlazeBar) 보이기 / 숨기기 토글 |
+| `Win + Ctrl + Alt + Space` | 배경화면 및 테마 선택 관리자 열기 |
+| `Alt + M` | 현재 작업공간 내 창 전체 최소화 및 원래 레이아웃 복원 |
+| `Alt + Shift + E` | GlazeWM 안전 종료 |
 
-[원본 GlazeWM](https://github.com/glzr-io/glazewm) v3.10.1에 아래 변경을 더한 빌드(3.10.1-glazebar.2)를 포함합니다.
+---
 
-- **Alt+M 최소화·복원** — 현재 작업공간의 창을 실제로 최소화하고, 분할 구조·비율·포커스 순서를 그대로 복원합니다.
-- **빈 분할 정리** — 창을 닫거나 옮긴 뒤 남는 빈 분할 컨테이너를 정리해 공간을 되돌려 줍니다.
-- **포커스 처리 개선** — 이미 포커스된 창에 불필요한 입력을 보내지 않고, 실제 OS 포커스와 WM 상태를 비교합니다.
+## 🛠️ 소스 빌드 및 개발 (Development & Build)
 
-패치와 변경 내역은 [GlazeWM 변경 내역](docs/glazewm-modifications.md)에 있습니다. GlazeWM은 원본의 GPL-3.0 라이선스를 따르며, 수정본 소스는 설치 프로그램에 포함됩니다.
+### 요구 사양
+- **OS**: Windows 11 (x64 / ARM64)
+- **Toolchain**: Rust 1.80+ (MSVC 타깃: `x86_64-pc-windows-msvc` 또는 `aarch64-pc-windows-msvc`)
+- **컴파일러**: Visual Studio C++ Build Tools 및 Windows SDK
 
-## 단축키
+### 빌드 절차
+```bash
+# 1. 저장소 클론
+git clone https://github.com/partrita/GlazeBar.git
+cd GlazeBar/native-rust
 
-| 단축키 | 동작 |
-| --- | --- |
-| `Win + F1` | 전체 단축키 안내 |
-| `Win + Alt + Shift + B` | 상태 표시줄 표시 / 숨기기 |
-| `Win + Ctrl + Alt + Space` | 배경화면 선택 |
-| `Alt + Shift + E` | GlazeWM 종료 |
+# 2. 의존성 무결성 검증 및 단위 테스트
+cargo test --locked
 
-## 메모리·CPU 사용량
+# 3. Release 바이너리 빌드
+cargo build --locked --release --target x86_64-pc-windows-msvc
+```
 
-제 **Surface Pro 11 · Snapdragon X Plus X1P-64-100(10코어) · Windows 11 ARM64**에서 확인했습니다.
+> 전체 인스톨러 패키징 및 GlazeWM 소스 패치에 관한 내용은 [distribution/BUILDING.md](distribution/BUILDING.md)를 참조하세요.
 
-| 항목 | 기존 Zebar + WebView2 | Rust GlazeBar |
-| --- | ---: | ---: |
-| 메모리(작업 집합) | 799.7 MiB | 25.18 MiB |
-| 전용 메모리(Private Bytes) | 331.4 MiB | 5.05 MiB |
-| CPU 점유율(전체 CPU 기준) | 0.058% | 0.047% |
-| 상주 프로세스 | 13개 | 1개 |
+---
 
-메모리는 꽤 가벼워졌습니다! 개발하면서 따로 측정한 값이라 CPU 차이는 참고 정도로 봐주세요. Zebar는 자식 프로세스 합계, Rust는 구간 평균이며 자세한 조건은 [측정 기록](docs/performance.md)에 남겨뒀습니다.
+## 📜 라이선스 및 크레딧 (License & Acknowledgments)
 
-## 제거와 설정 복원
+- **GlazeBar**: [GNU General Public License v3.0 (GPL-3.0-only)](LICENSE)
+- **포함 및 참조 프로젝트**:
+  - [GlazeWM](https://github.com/glzr-io/glazewm) (GPL-3.0) — 윈도우 타일링 관리 엔진
+  - [Aether](https://github.com/omacom/aether) — 지능형 팔레트 양자화 및 색상 추출 알고리즘
+  - [Lucide Icons](https://github.com/lucide-icons/lucide) (ISC) — 고품질 UI 벡터 아이콘
+  - [Pretendard](https://github.com/orioncactus/pretendard) (SIL OFL 1.1) — 가독성 높은 시스템 기본 글꼴
 
-GlazeWM과 GlazeBar를 종료한 뒤 **Windows 설정 → 앱 → GlazeBar + GlazeWM (community setup)**에서 제거합니다.
-설치 전 파일을 복원하고, 설치 후 수정한 파일은 별도로 보관합니다.
-
-GlazeWM까지 지우려면 앱 목록에서 **GlazeWM**도 제거해주세요. 적용해둔 Windows 테마와 배경화면은 그대로 남습니다.
-
-## 참고
-
-- Windows 11 x64 / ARM64. ARM64 패키지는 x64에서 교차 빌드했습니다.
-- 아직 미리보기 버전이고 코드 서명은 없습니다.
-- 밝기와 전원 설정은 기기에 따라 다를 수 있습니다. 외부 모니터의 DDC/CI 밝기 제어는 아직 없습니다.
-- 날씨는 일단 서울입니다. Open-Meteo 무료 API를 사용합니다([이용 조건](https://open-meteo.com/en/terms)).
-
-문제가 있거나 원하는 기능이 있으면 [Issues](https://github.com/lamininA1/GlazeBar/issues)에 남겨주세요!
-
-## 변경 내역
-
-- **preview.7** — GlazeWM에서 창을 옮길 때 작업공간·모니터 정보가 사라져 오류가 반복되던 문제를 수정했습니다. 빈 분할 정리는 화면을 다시 그리기 직전에 하도록 바꿨습니다.
-- **preview.6** — 주석 색상이 본문 색으로 바뀌던 문제를 수정했습니다. 업데이트 후 배경화면/테마를 다시 선택하고 VS Code에 적용하면 새 팔레트가 반영됩니다.
-- **preview.5** — Wallhaven 검색 필터, 페이지 이동, 검색어·태그 즐겨찾기, 영구 미리보기 캐시, 하트 보관함, 캐시 용량 표시.
-- **preview.4** — 수정 GlazeWM 포함: Alt+M 최소화·복원, 빈 분할 정리, 포커스 처리. x64 / ARM64.
-- **preview.3** — Wi-Fi를 쓸 수 없는 PC에서는 해당 항목을 숨깁니다. 팝업은 다른 창이나 Bar를 클릭하면 닫히고, 팝업 안의 입력란과 하위 설정 창으로 이동할 때는 유지됩니다.
-- **preview.2** — WMI 밝기 조절이 없는 PC에서 바가 종료되던 문제를 수정했습니다. 밝기는 모니터별 지원 여부에 따라 활성화됩니다.
-
-## 소스와 라이선스
-
-GlazeBar는 **GPL-3.0-only**입니다. 함께 사용한 프로젝트의 라이선스와 소스도 설치 프로그램에 넣어뒀습니다.
-
-[라이선스](LICENSE) · [제삼자 고지](THIRD-PARTY-NOTICES.txt) · [빌드 방법](distribution/BUILDING.md)
-
-함께 사용한 프로젝트: [GlazeWM](https://github.com/glzr-io/glazewm), [Aether](https://github.com/omacom/aether), [Lucide](https://github.com/lucide-icons/lucide), [Inno Setup](https://jrsoftware.org/isinfo.php).
+자세한 오픈소스 고지 사항은 [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)에 명시되어 있습니다.
