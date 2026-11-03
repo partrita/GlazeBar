@@ -44,7 +44,7 @@ jobs:
           arch: ${{ matrix.msvc_arch }}
 
       - name: Cache Cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/
