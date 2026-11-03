@@ -262,24 +262,29 @@ pub fn connected_network() -> (bool, String, u32) {
                         &mut data,
                         &mut ty,
                     ) == 0
-                        && !data.is_null()
                     {
-                        let data_ptr = data as *const WLAN_CONNECTION_ATTRIBUTES;
-                        if size as usize >= size_of::<WLAN_CONNECTION_ATTRIBUTES>()
-                            && data_ptr.is_aligned()
-                        {
-                            let attr = data_ptr.read_unaligned().wlanAssociationAttributes;
-                            result = (
-                                true,
-                                String::from_utf8_lossy(
-                                    &attr.dot11Ssid.ucSSID
-                                        [..(attr.dot11Ssid.uSSIDLength as usize).min(32)],
-                                )
-                                .to_string(),
-                                attr.wlanSignalQuality,
-                            );
+                        if let Some(data_ptr) = std::ptr::NonNull::new(data) {
+                            if size as usize >= size_of::<WLAN_CONNECTION_ATTRIBUTES>() {
+                                let mut attrs =
+                                    std::mem::MaybeUninit::<WLAN_CONNECTION_ATTRIBUTES>::uninit();
+                                std::ptr::copy_nonoverlapping(
+                                    data_ptr.as_ptr() as *const u8,
+                                    attrs.as_mut_ptr() as *mut u8,
+                                    size_of::<WLAN_CONNECTION_ATTRIBUTES>(),
+                                );
+                                let attr = attrs.assume_init().wlanAssociationAttributes;
+                                result = (
+                                    true,
+                                    String::from_utf8_lossy(
+                                        &attr.dot11Ssid.ucSSID
+                                            [..(attr.dot11Ssid.uSSIDLength as usize).min(32)],
+                                    )
+                                    .to_string(),
+                                    attr.wlanSignalQuality,
+                                );
+                            }
+                            WlanFreeMemory(data_ptr.as_ptr());
                         }
-                        WlanFreeMemory(data);
                     }
                     break;
                 }
