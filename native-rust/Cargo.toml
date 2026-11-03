@@ -8,7 +8,7 @@ license = "GPL-3.0-only"
 [dependencies]
 gif = "0.14.2"
 anyhow = "1.0.102"
-base64 = "0.22.1"
+base64 = "0.23.1"
 tempfile = "3.27.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
