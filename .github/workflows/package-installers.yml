@@ -1,12 +1,15 @@
 name: Package release installers
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing draft release tag containing both verified bundle ZIPs
-        required: true
-        default: v0.1.0-preview.7
+        description: Target release tag (leave blank to use current git tag/ref)
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -18,59 +21,77 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ inputs.tag }}
+      RELEASE_TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Check tag and source
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Inno Setup
+        uses: emilytrau/Setup-InnoSetup@v1
+
+      - name: Verify release tag and release state
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:RELEASE_TAG -notmatch '^v0\.1\.0-preview\.\d+$') { throw 'Unexpected release tag' }
-          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,tagName | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0 -or !$release.isDraft) { throw 'Packaging requires an existing draft release' }
-          git clone --depth 1 --branch $env:RELEASE_TAG "https://github.com/$env:GITHUB_REPOSITORY.git" release-source
-          if ($LASTEXITCODE -ne 0) { throw 'Source checkout failed' }
+          Write-Host "Target release tag: $env:RELEASE_TAG"
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') {
+            throw "Invalid release tag format: $env:RELEASE_TAG (expected semver like v0.1.0 or v0.1.0-preview.7)"
+          }
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,tagName 2>$null | ConvertFrom-Json
+          if (!$release) {
+            Write-Host "Release $env:RELEASE_TAG does not exist yet. Creating release..."
+            $isPrerelease = $env:RELEASE_TAG -match '-'
+            if ($isPrerelease) {
+              gh release create $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --title $env:RELEASE_TAG --generate-notes --prerelease
+            } else {
+              gh release create $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --title $env:RELEASE_TAG --generate-notes
+            }
+          }
+
       - name: Download and verify bundle archives
-        working-directory: release-source
         run: |
           $ErrorActionPreference = 'Stop'
           gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern 'GlazeBar-Community-*-windows-*.zip' --pattern SHA256SUMS.txt --dir downloaded
           if ($LASTEXITCODE -ne 0) { throw 'Bundle download failed' }
-          $version = $env:RELEASE_TAG.Substring(1)
+          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
           $checksums = Get-Content downloaded/SHA256SUMS.txt
           foreach ($arch in 'x64','arm64') {
             $name = "GlazeBar-Community-$version-windows-$arch.zip"
             $expected = @($checksums | Where-Object { $_ -match ('  ' + [regex]::Escape($name) + '$') })
             if ($expected.Count -ne 1) { throw "Missing checksum: $name" }
             if ((Get-FileHash "downloaded/$name").Hash -ne $expected[0].Split(' ')[0]) { throw "Archive checksum mismatch: $name" }
-            Expand-Archive "downloaded/$name" "distribution/output-release/GlazeBar-Community-$version-windows-$arch"
+            Expand-Archive "downloaded/$name" "distribution/output-release/GlazeBar-Community-$version-windows-$arch" -Force
           }
+
       - name: Validate isolated bundle installation and restore
-        working-directory: release-source
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = $env:RELEASE_TAG.Substring(1)
+          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
           foreach ($arch in 'x64','arm64') {
             ./distribution/Test-Bundle.ps1 -Bundle "distribution/output-release/GlazeBar-Community-$version-windows-$arch"
           }
+
       - name: Compile installers and check x64 startup
-        working-directory: release-source
         run: |
           $ErrorActionPreference = 'Stop'
-          $compiler = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          $compiler = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          if (!$compiler -or !(Test-Path $compiler)) {
+            $compiler = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          }
           if (!(Test-Path $compiler)) {
             choco install innosetup --version=6.7.3 --yes --no-progress --limit-output
-            if ($LASTEXITCODE -ne 0 -or !(Test-Path $compiler)) { throw 'Inno Setup installation failed on temporary runner' }
+            if ($LASTEXITCODE -ne 0 -or !(Test-Path $compiler)) { throw 'Inno Setup installation failed' }
           }
-          $version = $env:RELEASE_TAG.Substring(1)
+          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
           ./distribution/Build-Setup.ps1 -BundleRoot distribution/output-release -Version $version -Architectures x64,arm64 -Compiler $compiler
           ./distribution/Test-SetupStartup.ps1 -SetupExe "distribution/setup-output/GlazeBar-GlazeWM-Setup-$version-x64.exe"
+
       - name: Upload installers, checksums and validation
-        working-directory: release-source
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = $env:RELEASE_TAG.Substring(1)
+          $version = if ($env:RELEASE_TAG.StartsWith('v')) { $env:RELEASE_TAG.Substring(1) } else { $env:RELEASE_TAG }
           $checksums = @(Get-Content downloaded/SHA256SUMS.txt) + @(Get-Content distribution/setup-output/SHA256SUMS.txt)
           $checksums | Sort-Object -Unique | Set-Content SHA256SUMS.txt -Encoding ascii
           $validation = [ordered]@{
