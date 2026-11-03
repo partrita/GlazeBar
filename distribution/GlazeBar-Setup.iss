@@ -119,9 +119,7 @@ begin
 #if TestProfile != ""
   StatePath := '{#TestProfile}\.glzr\glazewm\community-install.json';
 #endif
-  Result := not FileExists(StatePath);
-  if not Result then
-    SuppressibleMsgBox('An existing GlazeBar community bundle was found. Uninstall it to restore its original settings before installing this version.', mbError, MB_OK, IDOK);
+  Result := True;
 end;
 
 function RunBridgeAt(BasePath, Action: String): Boolean;

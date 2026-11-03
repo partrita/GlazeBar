@@ -29,7 +29,14 @@ if (!$StageOnly) {
 }
 $target = Join-Path $ProfileRoot '.glzr\glazewm'
 $stateFile = Join-Path $target 'community-install.json'
-if (Test-Path -LiteralPath $stateFile) { throw 'Uninstall the existing community bundle before installing another version.' }
+if (Test-Path -LiteralPath $stateFile) {
+    Write-Output 'Existing community installation detected. Uninstalling previous version first...'
+    $uninstallScript = Join-Path $PSScriptRoot 'Uninstall.ps1'
+    $uninstallArgs = @{}
+    if ($StageOnly) { $uninstallArgs.StageOnly = $true }
+    $uninstallArgs.ProfileRoot = $ProfileRoot
+    & $uninstallScript @uninstallArgs
+}
 $backup = Join-Path $ProfileRoot ('.glzr\community-backups\' + [Guid]::NewGuid().ToString('N'))
 $payload = Join-Path $PSScriptRoot 'payload'
 $entries = @()
