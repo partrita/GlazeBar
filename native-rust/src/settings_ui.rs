@@ -60,6 +60,23 @@ pub const GAPS: [(&str, &str); 4] = [
     ("넓게 (24px)", "24px"),
 ];
 
+pub const CLOCK_FORMATS: [(&str, &str); 5] = [
+    ("전체", "년/월/일 요일 시:분"),
+    ("시간만", "시:분"),
+    ("날짜만", "년/월/일 요일"),
+    ("간략형", "월/일 시:분"),
+    ("ISO", "YYYY-MM-DD HH:MM"),
+];
+
+pub const OPACITY_STEPS: [(&str, u8); 6] = [
+    ("100% (불투명)", 100),
+    ("80%", 80),
+    ("60%", 60),
+    ("40%", 40),
+    ("20%", 20),
+    ("0% (완전 투명)", 0),
+];
+
 fn default_true() -> bool {
     true
 }
@@ -90,6 +107,10 @@ pub struct BarSettings {
     pub show_quick_buttons: bool,
     #[serde(default)]
     pub weather_city: usize,
+    #[serde(default)]
+    pub clock_format_idx: usize,
+    #[serde(default)]
+    pub opacity_idx: usize,
     #[serde(default = "default_true")]
     pub auto_split: bool,
     #[serde(default)]
@@ -116,6 +137,8 @@ impl Default for BarSettings {
             show_scale: true,
             show_quick_buttons: false,
             weather_city: 0,
+            clock_format_idx: 0,
+            opacity_idx: 0,
             auto_split: true,
             terminal_idx: 0,
             browser_idx: 0,
@@ -137,6 +160,8 @@ pub enum Edit {
     ToggleScale,
     ToggleQuickButtons,
     CycleCity,
+    CycleClockFormat,
+    CycleOpacity,
     ToggleAutoSplit,
     CycleTerminal,
     CycleBrowser,
@@ -157,6 +182,8 @@ impl BarSettings {
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default();
         s.weather_city = s.weather_city.min(CITIES.len().saturating_sub(1));
+        s.clock_format_idx = s.clock_format_idx.min(CLOCK_FORMATS.len().saturating_sub(1));
+        s.opacity_idx = s.opacity_idx.min(OPACITY_STEPS.len().saturating_sub(1));
         s.terminal_idx = s.terminal_idx.min(TERMINALS.len().saturating_sub(1));
         s.browser_idx = s.browser_idx.min(BROWSERS.len().saturating_sub(1));
         s.gap_idx = s.gap_idx.min(GAPS.len().saturating_sub(1));
@@ -209,6 +236,12 @@ impl BarSettings {
             Edit::ToggleScale => self.show_scale = !self.show_scale,
             Edit::ToggleQuickButtons => self.show_quick_buttons = !self.show_quick_buttons,
             Edit::CycleCity => self.weather_city = (self.weather_city + 1) % CITIES.len(),
+            Edit::CycleClockFormat => {
+                self.clock_format_idx = (self.clock_format_idx + 1) % CLOCK_FORMATS.len()
+            }
+            Edit::CycleOpacity => {
+                self.opacity_idx = (self.opacity_idx + 1) % OPACITY_STEPS.len()
+            }
             Edit::ToggleAutoSplit => self.auto_split = !self.auto_split,
             Edit::CycleTerminal => self.terminal_idx = (self.terminal_idx + 1) % TERMINALS.len(),
             Edit::CycleBrowser => self.browser_idx = (self.browser_idx + 1) % BROWSERS.len(),
@@ -288,12 +321,12 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         Action::Close,
     );
 
-    // Section 1: 상단 바 표시 위젯 & 날씨
+    // Section 1: 상단 바 표시 위젯 & 스타일
     let sec1 = Rect::new(s(24.), s(76.), w - s(48.), s(118.));
     c.round_rect(sec1, c.ui.surface, s(8.));
     c.text(
-        "상단 바 위젯 표시 및 날씨 설정",
-        Rect::new(s(38.), s(84.), s(300.), s(22.)),
+        "상단 바 위젯 및 디스플레이 설정",
+        Rect::new(s(38.), s(84.), s(240.), s(22.)),
         c.ui.accent,
         12.,
         true,
@@ -301,16 +334,50 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     );
 
     let city_name = CITIES.get(v.weather_city).map(|c| c.name).unwrap_or("서울");
-    let city_btn = Rect::new(w - s(224.), s(82.), s(186.), s(26.));
+    let clock_name = CLOCK_FORMATS
+        .get(v.clock_format_idx)
+        .map(|c| c.0)
+        .unwrap_or(CLOCK_FORMATS[0].0);
+    let opacity_name = OPACITY_STEPS
+        .get(v.opacity_idx)
+        .map(|s| s.0)
+        .unwrap_or(OPACITY_STEPS[0].0);
+
+    let btn_w = s(166.);
+    let city_btn = Rect::new(w - s(38.) - btn_w, s(82.), btn_w, s(26.));
     views::button(
         c,
         &mut hits,
-        &format!("날씨 지역 · {city_name} (변경)"),
+        &format!("날씨 · {city_name} (변경)"),
         city_btn,
         false,
         hover.is_some_and(|(x, y)| city_btn.contains(x, y)),
         true,
         Action::Settings(Edit::CycleCity),
+    );
+
+    let clock_btn = Rect::new(city_btn.x - s(10.) - btn_w, s(82.), btn_w, s(26.));
+    views::button(
+        c,
+        &mut hits,
+        &format!("시계 · {clock_name} (변경)"),
+        clock_btn,
+        false,
+        hover.is_some_and(|(x, y)| clock_btn.contains(x, y)),
+        true,
+        Action::Settings(Edit::CycleClockFormat),
+    );
+
+    let opacity_btn = Rect::new(clock_btn.x - s(10.) - btn_w, s(82.), btn_w, s(26.));
+    views::button(
+        c,
+        &mut hits,
+        &format!("투명도 · {opacity_name}"),
+        opacity_btn,
+        false,
+        hover.is_some_and(|(x, y)| opacity_btn.contains(x, y)),
+        true,
+        Action::Settings(Edit::CycleOpacity),
     );
 
     let col_w = (w - s(76.)) / 4;
@@ -513,6 +580,8 @@ mod tests {
         assert!(s.show_weather);
         assert_eq!(s.targets, [true; 16]);
         s.apply_edit(&Edit::CycleCity);
+        s.apply_edit(&Edit::CycleClockFormat);
+        s.apply_edit(&Edit::CycleOpacity);
         s.apply_edit(&Edit::CycleTerminal);
         s.apply_edit(&Edit::ToggleAutoSplit);
         s.apply_edit(&Edit::ToggleTarget(4));
@@ -520,6 +589,8 @@ mod tests {
 
         let loaded = BarSettings::load(dir.path());
         assert_eq!(loaded.weather_city, 1);
+        assert_eq!(loaded.clock_format_idx, 1);
+        assert_eq!(loaded.opacity_idx, 1);
         assert_eq!(loaded.terminal_idx, 1);
         assert!(!loaded.auto_split);
         assert!(!loaded.targets[4]);

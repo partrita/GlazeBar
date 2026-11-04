@@ -159,6 +159,35 @@ impl State {
         }
     }
 }
+pub fn apply_window_opacity(hwnd: HWND, opacity_pct: u8, colorkey: Option<u32>) {
+    unsafe {
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        if opacity_pct >= 100 {
+            if (ex_style & WS_EX_LAYERED as i32) != 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style & !(WS_EX_LAYERED as i32));
+                InvalidateRect(hwnd, null(), 1);
+            }
+        } else if opacity_pct == 0 {
+            if (ex_style & WS_EX_LAYERED as i32) == 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED as i32);
+            }
+            if let Some(key) = colorkey {
+                SetLayeredWindowAttributes(hwnd, key, 0, LWA_COLORKEY);
+            } else {
+                SetLayeredWindowAttributes(hwnd, 0, 0, LWA_ALPHA);
+            }
+            InvalidateRect(hwnd, null(), 1);
+        } else {
+            let alpha = ((opacity_pct.clamp(1, 99) as u32 * 255) / 100) as u8;
+            if (ex_style & WS_EX_LAYERED as i32) == 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED as i32);
+            }
+            SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
+            InvalidateRect(hwnd, null(), 1);
+        }
+    }
+}
+
 pub struct Window {
     pub hwnd: HWND,
     pub state: Rc<RefCell<State>>,
@@ -234,6 +263,10 @@ impl Window {
         unsafe {
             InvalidateRect(self.hwnd, null(), 0);
         }
+    }
+    pub fn set_opacity(&self, opacity_pct: u8) {
+        let bg = self.state.borrow().palette.bg;
+        apply_window_opacity(self.hwnd, opacity_pct, Some(bg));
     }
     pub fn owns_focus(&self, target: HWND) -> bool {
         unsafe {

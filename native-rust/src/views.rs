@@ -375,7 +375,13 @@ pub fn bar_with_settings(
     }
     let dw = c.measure(clock, 12.5, true);
     let dx = (c.width - dw) / 2;
-    c.text(clock, Rect::new(dx, 0, dw, h), ui.text, 12.5, true, 0);
+    let clock_rect = Rect::new(dx, 0, dw, h);
+    c.text(clock, clock_rect, ui.text, 12.5, true, 0);
+    hit(
+        &mut hits,
+        Rect::new(dx - c.p(6.), 0, dw + c.p(12.), h),
+        Action::Settings(crate::settings_ui::Edit::CycleClockFormat),
+    );
     let sr = Rect::new(dx - c.p(40.), (h - c.p(28.)) / 2, c.p(28.), c.p(28.));
     if settings.show_scale && sr.x > left {
         c.fill(sr, ui.surface);
@@ -398,22 +404,56 @@ pub fn bar_with_settings(
             hit(&mut hits, br, Action::Brightness);
         }
     }
-    c.fill(Rect::new(0, h - 1, c.width, 1), ui.border);
+    let is_transparent = crate::settings_ui::OPACITY_STEPS
+        .get(settings.opacity_idx)
+        .is_some_and(|s| s.1 == 0);
+    if !is_transparent {
+        c.fill(Rect::new(0, h - 1, c.width, 1), ui.border);
+    }
     hits
 }
-pub fn clock() -> String {
+pub fn clock_formatted(idx: usize) -> String {
     let now = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap());
     let day =
         ["일", "월", "화", "수", "목", "금", "토"][now.weekday().num_days_from_sunday() as usize];
-    format!(
-        "{}년 {}월 {}일 ({}) {:02}:{:02}",
-        now.year(),
-        now.month(),
-        now.day(),
-        day,
-        now.hour(),
-        now.minute()
-    )
+    match idx {
+        1 => format!("{:02}:{:02}", now.hour(), now.minute()),
+        2 => format!(
+            "{}년 {}월 {}일 ({})",
+            now.year(),
+            now.month(),
+            now.day(),
+            day
+        ),
+        3 => format!(
+            "{}월 {}일 {:02}:{:02}",
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute()
+        ),
+        4 => format!(
+            "{}-{:02}-{:02} {:02}:{:02}",
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour(),
+            now.minute()
+        ),
+        _ => format!(
+            "{}년 {}월 {}일 ({}) {:02}:{:02}",
+            now.year(),
+            now.month(),
+            now.day(),
+            day,
+            now.hour(),
+            now.minute()
+        ),
+    }
+}
+
+pub fn clock() -> String {
+    clock_formatted(0)
 }
 pub fn button(
     c: &mut Canvas,

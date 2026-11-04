@@ -65,6 +65,33 @@ pub struct Plan {
     state: PathBuf,
 }
 
+pub const ALL_TARGETS: &[&str] = &[
+    "windows",
+    "glazebar",
+    "terminal",
+    "rio",
+    "wezterm",
+    "alacritty",
+    "hyper",
+    "putty",
+    "vscode",
+    "zed",
+    "codex",
+    "antigravity",
+    "claude",
+    "opencode",
+    "firefox",
+    "chrome",
+    "edge",
+    "pwsh",
+    "starship",
+    "neovim",
+    "mintty",
+    "bat",
+    "delta",
+    "jetbrains",
+];
+
 pub fn canonical_target(t: &str) -> Option<&'static str> {
     match t.trim().to_ascii_lowercase().as_str() {
         "glazebar" | "glazewm" => Some("glazebar"),
@@ -84,6 +111,15 @@ pub fn canonical_target(t: &str) -> Option<&'static str> {
         "chrome" | "google-chrome" => Some("chrome"),
         "edge" | "msedge" | "microsoft-edge" => Some("edge"),
         "windows" => Some("windows"),
+        "pwsh" | "powershell" => Some("pwsh"),
+        "starship" => Some("starship"),
+        "neovim" | "nvim" => Some("neovim"),
+        "mintty" | "git-bash" | "gitbash" => Some("mintty"),
+        "bat" => Some("bat"),
+        "delta" => Some("delta"),
+        "jetbrains" | "intellij" | "rider" | "pycharm" | "webstorm" | "clion" | "goland" => {
+            Some("jetbrains")
+        }
         _ => None,
     }
 }
@@ -149,6 +185,14 @@ impl Plan {
         ensure!(!r.targets.is_empty(), "select at least one theme target");
         let mut normalized = Vec::with_capacity(r.targets.len());
         for t in &r.targets {
+            if t.eq_ignore_ascii_case("all") || t.eq_ignore_ascii_case("--all") {
+                for &target in ALL_TARGETS {
+                    if !normalized.contains(&target) {
+                        normalized.push(target);
+                    }
+                }
+                continue;
+            }
             let Some(canon) = canonical_target(t) else {
                 bail!("unsupported theme target: {t}");
             };
@@ -513,22 +557,153 @@ impl Plan {
                 plan.applied.push("putty".into());
             }
         }
+        if wanted("pwsh") {
+            let paths = pwsh_profile_paths(home);
+            if paths.is_empty() {
+                plan.skipped.push("pwsh".into());
+            } else {
+                for path in paths {
+                    let source = text_raw(&path)?;
+                    plan.add(
+                        path,
+                        theme_text::powershell_profile(&source, &p, r.light).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("pwsh".into());
+            }
+        }
+        if wanted("starship") {
+            let paths = starship_config_paths(home);
+            if paths.is_empty() {
+                plan.skipped.push("starship".into());
+            } else {
+                for path in paths {
+                    let source = text_raw(&path)?;
+                    plan.add(
+                        path,
+                        theme_text::starship_settings(&source, &p).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("starship".into());
+            }
+        }
+        if wanted("mintty") {
+            let paths = mintty_config_paths(home);
+            if paths.is_empty() {
+                plan.skipped.push("mintty".into());
+            } else {
+                for path in paths {
+                    let source = text_raw(&path)?;
+                    plan.add(
+                        path,
+                        theme_text::mintty_settings(&source, &p, r.light).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("mintty".into());
+            }
+        }
+        if wanted("neovim") {
+            let dirs = neovim_dirs(home);
+            if dirs.is_empty() {
+                plan.skipped.push("neovim".into());
+            } else {
+                for dir in dirs {
+                    plan.add(
+                        dir.join("colors/glazebar-aether.lua"),
+                        theme_text::neovim_theme(&p, r.light).into_bytes(),
+                    )?;
+                    let init_lua = dir.join("init.lua");
+                    let source = text_raw(&init_lua)?;
+                    plan.add(
+                        init_lua,
+                        theme_text::neovim_settings(&source).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("neovim".into());
+            }
+        }
+        if wanted("bat") {
+            let dirs = bat_dirs(home);
+            if dirs.is_empty() {
+                plan.skipped.push("bat".into());
+            } else {
+                for dir in dirs {
+                    let config = dir.join("config");
+                    let source = text_raw(&config)?;
+                    plan.add(
+                        config,
+                        theme_text::bat_settings(&source, "glazebar-aether").into_bytes(),
+                    )?;
+                    plan.add(
+                        dir.join("themes/glazebar-aether.tmTheme"),
+                        theme::textmate(&p).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("bat".into());
+            }
+        }
+        if wanted("delta") {
+            let paths = gitconfig_paths(home);
+            if paths.is_empty() {
+                plan.skipped.push("delta".into());
+            } else {
+                for path in paths {
+                    let source = text_raw(&path)?;
+                    plan.add(
+                        path,
+                        theme_text::delta_gitconfig(&source, &p, r.light).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("delta".into());
+            }
+        }
+        if wanted("jetbrains") {
+            let dirs = jetbrains_dirs(home);
+            if dirs.is_empty() {
+                plan.skipped.push("jetbrains".into());
+            } else {
+                for dir in dirs {
+                    plan.add(
+                        dir.join("colors/glazebar-aether.icls"),
+                        theme_text::jetbrains_color_scheme(&p, r.light).into_bytes(),
+                    )?;
+                    let options = dir.join("options/colors.scheme.xml");
+                    let source = text_raw(&options)?;
+                    plan.add(
+                        options,
+                        theme_text::jetbrains_scheme_settings(&source).into_bytes(),
+                    )?;
+                }
+                plan.applied.push("jetbrains".into());
+            }
+        }
         plan.add(
             plan.state.join("current-palette.json"),
             json(&serde_json::json!({"name":theme::NAME,"image":r.image,"mode":if r.mode.is_empty(){"normal"}else{&r.mode},"light":r.light,"palette":p}))?,
         )?;
         if wanted("windows") {
-            ensure!(
-                real_home,
-                "Windows integration cannot use an overridden home"
-            );
-            let options = r
-                .windows
-                .as_ref()
-                .context("choose Windows integration options")?;
-            plan.changes
-                .extend(crate::theme_windows::plan(&p, r.light, options)?);
-            plan.applied.push("windows".into());
+            if !real_home {
+                if r.targets.iter().any(|t| canonical_target(t) == Some("windows")) {
+                    ensure!(
+                        real_home,
+                        "Windows integration cannot use an overridden home"
+                    );
+                } else {
+                    plan.skipped.push("windows".into());
+                }
+            } else {
+                let default_opts = crate::theme_windows::Options {
+                    mode: true,
+                    accent: true,
+                    titlebars: Some(true),
+                    taskbar: Some(true),
+                    transparency: Some(true),
+                };
+                let options = r.windows.as_ref().unwrap_or(&default_opts);
+                plan.changes
+                    .extend(crate::theme_windows::plan(&p, r.light, options)?);
+                plan.applied.push("windows".into());
+            }
         }
         Ok(plan)
     }
@@ -785,6 +960,93 @@ fn hyper_configs(home: &Path) -> Vec<PathBuf> {
         files.push(dot_js);
     }
     files
+}
+fn pwsh_profile_paths(home: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![];
+    for rel in [
+        "Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+        "OneDrive/Documents/PowerShell/Microsoft.PowerShell_profile.ps1",
+        "Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
+        "OneDrive/Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1",
+        ".config/powershell/Microsoft.PowerShell_profile.ps1",
+    ] {
+        let p = home.join(rel);
+        if p.is_file() || p.parent().is_some_and(|d| d.is_dir()) {
+            if !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
+    }
+    paths
+}
+fn starship_config_paths(home: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![];
+    if let Some(custom) = std::env::var_os("STARSHIP_CONFIG").map(PathBuf::from) {
+        if custom.is_file() || custom.parent().is_some_and(|d| d.is_dir()) {
+            paths.push(custom);
+        }
+    }
+    let p = home.join(".config/starship.toml");
+    if (p.is_file() || home.join(".config").is_dir()) && !paths.contains(&p) {
+        paths.push(p);
+    }
+    paths
+}
+fn mintty_config_paths(home: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![];
+    for rel in [".minttyrc", "AppData/Roaming/mintty/config"] {
+        let p = home.join(rel);
+        if p.is_file() || (rel == ".minttyrc" && home.join("AppData/Local/Programs/Git").is_dir()) {
+            if !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
+    }
+    paths
+}
+fn neovim_dirs(home: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![];
+    for rel in ["AppData/Local/nvim", ".config/nvim"] {
+        let p = home.join(rel);
+        if p.is_dir() && !dirs.contains(&p) {
+            dirs.push(p);
+        }
+    }
+    dirs
+}
+fn bat_dirs(home: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![];
+    for rel in ["AppData/Roaming/bat", ".config/bat"] {
+        let p = home.join(rel);
+        if p.is_dir() && !dirs.contains(&p) {
+            dirs.push(p);
+        }
+    }
+    dirs
+}
+fn gitconfig_paths(home: &Path) -> Vec<PathBuf> {
+    let mut paths = vec![];
+    for rel in [".gitconfig", ".config/git/config"] {
+        let p = home.join(rel);
+        if p.is_file() && !paths.contains(&p) {
+            paths.push(p);
+        }
+    }
+    paths
+}
+fn jetbrains_dirs(home: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![];
+    let jb = home.join("AppData/Roaming/JetBrains");
+    if let Ok(entries) = fs::read_dir(jb) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                dirs.push(p);
+            }
+        }
+    }
+    dirs.sort();
+    dirs
 }
 fn reload(changes: &[Change]) -> Result<()> {
     crate::theme_windows::notify(changes);
@@ -1159,5 +1421,51 @@ mod tests {
         }
         assert!(state(temp.path()).join("last-backup.txt").exists());
         restore_with(temp.path(), |_| Ok(())).unwrap();
+    }
+    #[test]
+    fn windows_dev_tools_all_targets_applied_and_restored() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path();
+
+        // Setup directories for dev tools
+        fs::create_dir_all(home.join("Documents/PowerShell")).unwrap();
+        fs::create_dir_all(home.join(".config")).unwrap();
+        fs::create_dir_all(home.join("AppData/Local/nvim")).unwrap();
+        fs::create_dir_all(home.join("AppData/Roaming/bat")).unwrap();
+        fs::create_dir_all(home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/options")).unwrap();
+        atomic_write(&home.join(".minttyrc"), b"Font=Consolas\n").unwrap();
+        atomic_write(&home.join(".gitconfig"), b"[user]\nname=Test\n").unwrap();
+
+        let r = Request {
+            action: "apply".into(),
+            palette: vec!["#123456".into(); 16],
+            targets: vec!["all".into()],
+            ..Default::default()
+        };
+        let plan = Plan::build(home, &r).unwrap();
+        assert!(plan.applied.contains(&"pwsh".to_owned()));
+        assert!(plan.applied.contains(&"starship".to_owned()));
+        assert!(plan.applied.contains(&"neovim".to_owned()));
+        assert!(plan.applied.contains(&"mintty".to_owned()));
+        assert!(plan.applied.contains(&"bat".to_owned()));
+        assert!(plan.applied.contains(&"delta".to_owned()));
+        assert!(plan.applied.contains(&"jetbrains".to_owned()));
+
+        plan.apply_with(|_| Ok(())).unwrap();
+
+        assert!(home.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1").exists());
+        assert!(home.join(".config/starship.toml").exists());
+        assert!(home.join("AppData/Local/nvim/colors/glazebar-aether.lua").exists());
+        assert!(home.join("AppData/Local/nvim/init.lua").exists());
+        assert!(home.join("AppData/Roaming/bat/config").exists());
+        assert!(home.join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme").exists());
+        assert!(home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/colors/glazebar-aether.icls").exists());
+
+        restore_with(home, |_| Ok(())).unwrap();
+
+        assert!(!home.join("AppData/Local/nvim/colors/glazebar-aether.lua").exists());
+        assert!(!home.join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme").exists());
+        let mintty_restored = fs::read_to_string(home.join(".minttyrc")).unwrap();
+        assert_eq!(mintty_restored, "Font=Consolas\n");
     }
 }

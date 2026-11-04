@@ -87,8 +87,9 @@ GlazeBar에서 테마를 변경하면 시스템에 설치된 주요 개발 도�
 ```mermaid
 flowchart TD
     GB[GlazeBar 테마 엔진\n사진 추출 / 컬러 스킴] -->|Direct2D / Win32| OS[Windows 11 OS\n강조색 / 다크·라이트 / 타이틀바]
-    GB -->|Config Sync| EDITORS[개발 에디터\nVS Code / Zed / Codex / OpenCode]
-    GB -->|Color Palette| TERMS[터미널\nWindows Terminal / WezTerm / Alacritty / Rio / Hyper / PuTTY]
+    GB -->|Config Sync| EDITORS[개발 에디터 & IDE\nVS Code / Zed / Neovim / JetBrains / OpenCode / Codex]
+    GB -->|Color Palette| TERMS[터미널 & 셸\nWindows Terminal / WezTerm / Alacritty / Rio / Hyper / PuTTY / Git Bash / PowerShell / Starship]
+    GB -->|Tools & Pagers| TOOLS[CLI 도구\nBat / Delta / Antigravity / Claude Code]
     GB -->|Profile Injection| BROWSERS[웹 브라우저\nFirefox userChrome / Chrome / Edge]
     GB -->|Window Border| WM[GlazeWM\n타일링 테두리 및 상태 표시줄]
 ```
@@ -96,12 +97,18 @@ flowchart TD
 | 범주 | 지원 대상 | 동기화 항목 |
 | :--- | :--- | :--- |
 | 운영체제 | Windows 11 | 시스템 다크/라이트 모드, 강조색(Accent Color), 작업 표시줄, 제목 표시줄 투명도 |
+| 상단바 옵션 | GlazeBar Top Bar | 시간/날짜 표시 포맷(전체/시간만/날짜만/간략형/ISO), 상단바 투명도(100% ~ 0% 완전 투명) 조절 |
 | 터미널 | Windows Terminal | 기본 프로필 배경/전경색, 커서, 16색 ANSI 색상 테이블 |
 | | WezTerm / Alacritty / Rio | TOML/Lua 테마 파일 자동 생성 및 색상 블록 동기화 |
-| | Hyper / PuTTY | JavaScript 설정 및 Windows 레지스트리 세션 색상(`Colour0`~`Colour21`) 갱신 |
-| 에디터 | VS Code | 편집기, 사이드바, 상태 표시줄, 통합 터미널 및 구문 강조(Syntax) 테마 |
+| | Hyper / PuTTY / Git Bash | JavaScript 설정, MinTTY `.minttyrc`, 레지스트리 세션 색상(`Colour0`~`Colour21`) 갱신 |
+| 셸 & 프롬프트 | PowerShell / PSReadLine | `$PROFILE` 내 PSReadLine 24-bit TrueColor 구문 강조 자동 주입 |
+| | Starship Prompt | `starship.toml` 내 커스텀 팔레트(`[palettes.glazebar]`) 및 활성 테마 설정 |
+| 에디터 & IDE | VS Code | 편집기, 사이드바, 상태 표시줄, 통합 터미널 및 구문 강조(Syntax) 테마 |
 | | Zed Editor / OpenCode | 전용 JSON 테마 생성 및 활성 테마 매핑 |
+| | Neovim | `colors/glazebar-aether.lua` 하이라이트 생성 및 `init.lua` 테마 적용 |
+| | JetBrains IDE 전 제품군 | IntelliJ, Rider, PyCharm, WebStorm 등 에디터 컬러 스킴(`.icls`) 및 XML 동기화 |
 | CLI & Agent | Antigravity / Claude / Codex | CLI 설정 파일 내 색상 프로필 자동 반영 |
+| 페이저 & 도구 | Bat / Delta | bat 문맥 강조 테마 및 Git delta diff 24-bit 신택스 테마 블록 |
 | 브라우저 | Firefox / Chrome / Edge | `userChrome.css` 및 브라우저 프로필 테마 시드 색상 연동 |
 
 

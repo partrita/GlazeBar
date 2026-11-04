@@ -78,8 +78,13 @@ Turn on **색상 함께 적용** (apply colors too) in the wallpaper picker and 
 | --- | --- |
 | GlazeBar + GlazeWM | Bar, popups, and active window border |
 | Windows Terminal | Background, text, cursor, and terminal colors |
-| Codex CLI | Code and diff colors |
-| VS Code | Editor, sidebar, tabs, status bar, terminal, and syntax colors |
+| PowerShell & Starship | PSReadLine syntax highlighting and prompt palette colors |
+| Git Bash (MinTTY) | Terminal 16-color ANSI and cursor/background definitions |
+| Neovim & JetBrains IDEs | Lua colorscheme and XML editor color schemes (`.icls`) |
+| VS Code & Zed Editor | Editor, sidebar, tabs, status bar, terminal, and syntax colors |
+| Bat & Delta | Pager and git diff truecolor themes |
+| Codex CLI & AI Agents | Code, prompt, and diff colors |
+| GlazeBar Top Bar | Customizable time/date formats and bar opacity (100% down to 0% fully transparent) |
 | Windows | Dark/light mode, accent color, title bars, Start menu/taskbar, and transparency |
 
 You can choose which Windows settings to change separately. Use dark mode for taskbar accent colors.

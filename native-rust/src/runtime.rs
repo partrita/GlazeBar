@@ -561,7 +561,8 @@ pub fn run_with_popup(
     let mut model = Model::default();
     let mut sensors = Sensors::default();
     let mut hidden = !shadow && root.join("bar-hidden.txt").exists();
-    let mut last_clock = views::clock();
+    let initial_settings = crate::settings_ui::BarSettings::load(&root);
+    let mut last_clock = views::clock_formatted(initial_settings.clock_format_idx);
     let start = Instant::now();
     let mut wallpaper_captured = false;
     let mut comparison_captured = None;
@@ -1246,6 +1247,8 @@ pub fn run_with_popup(
                                             *brightness =
                                                 brightness_cache.get(&m.name).and_then(|v| v.0);
                                         }
+                                        let bar_settings = crate::settings_ui::BarSettings::load(&root);
+                                        window.set_opacity(crate::settings_ui::OPACITY_STEPS[bar_settings.opacity_idx].1);
                                         let mut bar = Bar {
                                             window,
                                             registered: false,
@@ -2031,60 +2034,93 @@ pub fn run_with_popup(
                         let mut next_control: Option<&'static str> = None;
                         let mut reload_wm = false;
                         let mut city_changed: Option<usize> = None;
-                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            if let Scene::Settings(v) = &mut w.state.borrow_mut().scene {
-                                use crate::settings_ui::Edit as E;
-                                match &edit {
-                                    E::OpenConfig => {
-                                        let cfg = root.join("config.yaml");
-                                        if let Some(s) = cfg.to_str() {
-                                            unsafe {
-                                                ShellExecuteW(
-                                                    hwnd as HWND,
-                                                    null(),
-                                                    wide(s).as_ptr(),
-                                                    null(),
-                                                    null(),
-                                                    SW_SHOWNORMAL,
-                                                );
+                        let is_popup = popup.as_ref().is_some_and(|w| w.hwnd as usize == hwnd);
+                        if is_popup {
+                            if let Some(w) = &popup {
+                                if let Scene::Settings(v) = &mut w.state.borrow_mut().scene {
+                                    use crate::settings_ui::Edit as E;
+                                    match &edit {
+                                        E::OpenConfig => {
+                                            let cfg = root.join("config.yaml");
+                                            if let Some(s) = cfg.to_str() {
+                                                unsafe {
+                                                    ShellExecuteW(
+                                                        hwnd as HWND,
+                                                        null(),
+                                                        wide(s).as_ptr(),
+                                                        null(),
+                                                        null(),
+                                                        SW_SHOWNORMAL,
+                                                    );
+                                                }
+                                            }
+                                            v.status =
+                                                "기본 편집기로 config.yaml 파일을 열었습니다.".into();
+                                        }
+                                        E::ReloadGlazeWM => {
+                                            let _ = v.save(&root);
+                                            reload_wm = true;
+                                            v.status =
+                                                "설정을 저장하고 GlazeWM에 다시 적용했습니다.".into();
+                                        }
+                                        E::OpenWallpaper => {
+                                            let _ = v.save(&root);
+                                            next_control = Some("Wallpaper");
+                                        }
+                                        E::OpenSheet => {
+                                            let _ = v.save(&root);
+                                            next_control = Some("Sheet");
+                                        }
+                                        E::Save => match v.save(&root) {
+                                            Ok(()) => {
+                                                reload_wm = true;
+                                                close_settings = true;
+                                            }
+                                            Err(e) => v.status = e.to_string(),
+                                        },
+                                        other => {
+                                            v.apply_edit(other);
+                                            let _ = v.save(&root);
+                                            if matches!(other, E::CycleCity) {
+                                                city_changed = Some(v.weather_city);
+                                            }
+                                            if matches!(other, E::CycleTerminal | E::CycleBrowser) {
+                                                reload_wm = true;
+                                            }
+                                            if matches!(other, E::CycleOpacity) {
+                                                for b in bars.values() {
+                                                    b.window.set_opacity(crate::settings_ui::OPACITY_STEPS[v.opacity_idx].1);
+                                                }
+                                            }
+                                            if matches!(other, E::CycleClockFormat) {
+                                                let new_clk = views::clock_formatted(v.clock_format_idx);
+                                                for b in bars.values() {
+                                                    if let Scene::Bar { clock: label, .. } = &mut b.window.state.borrow_mut().scene {
+                                                        *label = new_clk.clone();
+                                                    }
+                                                }
                                             }
                                         }
-                                        v.status =
-                                            "기본 편집기로 config.yaml 파일을 열었습니다.".into();
                                     }
-                                    E::ReloadGlazeWM => {
-                                        let _ = v.save(&root);
-                                        reload_wm = true;
-                                        v.status =
-                                            "설정을 저장하고 GlazeWM에 다시 적용했습니다.".into();
-                                    }
-                                    E::OpenWallpaper => {
-                                        let _ = v.save(&root);
-                                        next_control = Some("Wallpaper");
-                                    }
-                                    E::OpenSheet => {
-                                        let _ = v.save(&root);
-                                        next_control = Some("Sheet");
-                                    }
-                                    E::Save => match v.save(&root) {
-                                        Ok(()) => {
-                                            reload_wm = true;
-                                            close_settings = true;
-                                        }
-                                        Err(e) => v.status = e.to_string(),
-                                    },
-                                    other => {
-                                        v.apply_edit(other);
-                                        let _ = v.save(&root);
-                                        if matches!(other, E::CycleCity) {
-                                            city_changed = Some(v.weather_city);
-                                        }
-                                        if matches!(other, E::CycleTerminal | E::CycleBrowser) {
-                                            reload_wm = true;
-                                        }
+                                    w.invalidate();
+                                }
+                            }
+                        } else {
+                            let mut s = crate::settings_ui::BarSettings::load(&root);
+                            s.apply_edit(&edit);
+                            let _ = s.save(&root);
+                            if matches!(&edit, crate::settings_ui::Edit::CycleOpacity) {
+                                for b in bars.values() {
+                                    b.window.set_opacity(crate::settings_ui::OPACITY_STEPS[s.opacity_idx].1);
+                                }
+                            }
+                            if matches!(&edit, crate::settings_ui::Edit::CycleClockFormat) {
+                                let new_clk = views::clock_formatted(s.clock_format_idx);
+                                for b in bars.values() {
+                                    if let Scene::Bar { clock: label, .. } = &mut b.window.state.borrow_mut().scene {
+                                        *label = new_clk.clone();
                                     }
                                 }
-                                w.invalidate();
                             }
                         }
                         if let Some(city) = city_changed {
@@ -2590,7 +2626,8 @@ pub fn run_with_popup(
         } else {
             preview_popup = None;
         }
-        let clock = views::clock();
+        let timer_settings = crate::settings_ui::BarSettings::load(&root);
+        let clock = views::clock_formatted(timer_settings.clock_format_idx);
         if shadow {
             if let Some(w) = &child_popup {
                 if let Scene::Online(v) = &w.state.borrow().scene {
