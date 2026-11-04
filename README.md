@@ -97,7 +97,7 @@ flowchart TD
 | 범주 | 지원 대상 | 동기화 항목 |
 | : | : | : |
 | 운영체제 | Windows 11 | 시스템 다크/라이트 모드, 강조색(Accent Color), 작업 표시줄, 제목 표시줄 투명도 |
-| 상단바 옵션 | GlazeBar Top Bar | 시간/날짜 표시 포맷(전체/시간만/날짜만/간략형/ISO), 상단바 투명도(100%~60%) 조절 |
+| 상단바 옵션 | GlazeBar Top Bar | 시간/날짜 표시 포맷(전체/시간만/날짜만/간략형/ISO), 상단바 투명도(100% ~ 0% 완전 투명) 조절 |
 | 터미널 | Windows Terminal | 기본 프로필 배경/전경색, 커서, 16색 ANSI 색상 테이블 |
 | | WezTerm / Alacritty / Rio | TOML/Lua 테마 파일 자동 생성 및 색상 블록 동기화 |
 | | Hyper / PuTTY / Git Bash | JavaScript 설정, MinTTY `.minttyrc`, 레지스트리 세션 색상(`Colour0`~`Colour21`) 갱신 |

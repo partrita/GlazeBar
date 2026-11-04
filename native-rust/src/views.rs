@@ -401,7 +401,12 @@ pub fn bar_with_settings(
             hit(&mut hits, br, Action::Brightness);
         }
     }
-    c.fill(Rect::new(0, h - 1, c.width, 1), ui.border);
+    let is_transparent = crate::settings_ui::OPACITY_STEPS
+        .get(settings.opacity_idx)
+        .is_some_and(|s| s.1 == 0);
+    if !is_transparent {
+        c.fill(Rect::new(0, h - 1, c.width, 1), ui.border);
+    }
     hits
 }
 pub fn clock_formatted(idx: usize) -> String {

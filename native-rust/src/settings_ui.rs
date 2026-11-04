@@ -68,12 +68,13 @@ pub const CLOCK_FORMATS: [(&str, &str); 5] = [
     ("ISO", "YYYY-MM-DD HH:MM"),
 ];
 
-pub const OPACITY_STEPS: [(&str, u8); 5] = [
+pub const OPACITY_STEPS: [(&str, u8); 6] = [
     ("100% (불투명)", 100),
-    ("90%", 90),
     ("80%", 80),
-    ("70%", 70),
     ("60%", 60),
+    ("40%", 40),
+    ("20%", 20),
+    ("0% (완전 투명)", 0),
 ];
 
 fn default_true() -> bool {
