@@ -118,11 +118,25 @@ window_behavior:
       shown_on_top: false
 
 workspaces:
+  # 작업공간별 특정 모니터 고정 설정 (bind_to_monitor):
+  # - bind_to_monitor: 0 (주 모니터 / Primary Display)
+  # - bind_to_monitor: 1 (보조 모니터 / Secondary Display)
+  # - keep_alive: true (빈 작업공간이라도 모니터에 항상 유지)
   - name: '1'
+    bind_to_monitor: 0
+    keep_alive: true
   - name: '2'
+    bind_to_monitor: 0
+    keep_alive: true
   - name: '3'
+    bind_to_monitor: 1
+    keep_alive: true
   - name: '4'
+    bind_to_monitor: 1
+    keep_alive: true
   - name: '5'
+    bind_to_monitor: 1
+    keep_alive: true
   - name: '6'
   - name: '7'
   - name: '8'

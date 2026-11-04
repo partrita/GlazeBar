@@ -32,7 +32,7 @@ GlazeBar는 Windows 11 환경을 위한 초경량·고성능 Rust 기반 네이�
 동일 하드웨어 환경(Surface Pro 11 / Snapdragon X Plus X1P-64-100 / Windows 11 ARM64)에서 기존 웹 기반 상태 표시줄 솔루션과 실측 비교한 결과입니다.
 
 | 지표 | 기존 WebView2 기반 (Zebar) | GlazeBar (Native Rust) | 개선율 |
-| : | :: | :: | :: |
+| :--- | :--- | :--- | :--- |
 | 작업 집합 메모리 (Working Set) | 799.7 MiB | 25.18 MiB | 96.8% 절감 |
 | 전용 메모리 (Private Bytes) | 331.4 MiB | 5.05 MiB | 98.4% 절감 |
 | 상주 프로세스 수 (Processes) | 13개 프로세스 | 단일(1개) 프로세스 | 단순화 |
@@ -47,7 +47,7 @@ GlazeBar는 Windows 11 환경을 위한 초경량·고성능 Rust 기반 네이�
 GlazeBar는 x64 및 ARM64(Copilot+ PC, Snapdragon X) 아키텍처를 네이티브로 지원하며, 독립적인 Inno Setup 통합 설치 프로그램을 제공합니다.
 
 | 플랫폼 아키텍처 | 통합 설치 패키지 (All-in-One Installer) |
-| : | : |
+| :--- | :--- |
 | Windows 11 (x86_64 / Intel / AMD) | [⬇️ GlazeBar-GlazeWM-Setup-x64.exe](https://github.com/partrita/GlazeBar/releases/latest) |
 | Windows 11 on ARM (ARM64 / Snapdragon) | [⬇️ GlazeBar-GlazeWM-Setup-arm64.exe](https://github.com/partrita/GlazeBar/releases/latest) |
 
@@ -94,7 +94,7 @@ flowchart TD
 ```
 
 | 범주 | 지원 대상 | 동기화 항목 |
-| : | : | : |
+| :--- | :--- | :--- |
 | 운영체제 | Windows 11 | 시스템 다크/라이트 모드, 강조색(Accent Color), 작업 표시줄, 제목 표시줄 투명도 |
 | 터미널 | Windows Terminal | 기본 프로필 배경/전경색, 커서, 16색 ANSI 색상 테이블 |
 | | WezTerm / Alacritty / Rio | TOML/Lua 테마 파일 자동 생성 및 색상 블록 동기화 |
@@ -106,10 +106,52 @@ flowchart TD
 
 
 
+## 🖥️ 모니터별 작업공간(Workspace) 고정 사용법
+
+듀얼/트리플 모니터 환경에서 특정 작업공간을 원하는 모니터에 영구적으로 고정할 수 있습니다. `config.yaml`의 `workspaces:` 항목에 `bind_to_monitor`와 `keep_alive`를 설정합니다:
+
+```yaml
+workspaces:
+  # 주 모니터 (0번)에 고정
+  - name: '1'
+    bind_to_monitor: 0
+    keep_alive: true
+  - name: '2'
+    bind_to_monitor: 0
+    keep_alive: true
+
+  # 보조 모니터 (1번)에 고정
+  - name: '3'
+    bind_to_monitor: 1
+    keep_alive: true
+  - name: '4'
+    bind_to_monitor: 1
+    keep_alive: true
+
+  # 필요 시 자유롭게 이동하며 사용할 작업공간
+  - name: '5'
+```
+
+- **`bind_to_monitor: 0`**: Windows 주 디스플레이 (메인 모니터)에 작업공간 고정
+- **`bind_to_monitor: 1`**: 보조 디스플레이 (서브 모니터)에 작업공간 고정
+- **`keep_alive: true`**: 해당 작업공간에 열려 있는 창이 없더라도 작업공간이 닫히지 않고 모니터에 항상 유지
+
+> 💡 **특정 프로그램 자동 배치 (`window_rules`)**:  
+> 예를 들어 카카오톡이나 디스코드를 항상 3번 작업공간(보조 모니터)으로 자동 실행하려면 `config.yaml`의 `window_rules:`에 다음 설정을 추가합니다:
+> ```yaml
+> window_rules:
+>   - commands: ['move --workspace 3']
+>     match:
+>       - window_process: { equals: 'KakaoTalk' }
+>       - window_process: { equals: 'Discord' }
+> ```
+
+
+
 ## ⌨️ 기본 단축키 (Keyboard Shortcuts)
 
 | 단축키 | 기능 설명 |
-| : | : |
+| :--- | :--- |
 | `Win + F1` | 전체 단축키 및 Quick Start 안내 창 호출 |
 | `Win + Alt + Shift + B` | 상태 표시줄(GlazeBar) 보이기 / 숨기기 토글 |
 | `Win + Ctrl + Alt + Space` | 배경화면 및 테마 선택 관리자 열기 |

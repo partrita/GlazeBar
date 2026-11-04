@@ -29,6 +29,9 @@ pub enum Action {
     Compare(crate::style_compare_ui::Edit),
     WindowsOption(crate::windows_options_ui::Edit),
     Picker(crate::wallpaper_ui::Action),
+    QuickTheme,
+    QuickThemeSelect(String),
+    QuickThemeLight(bool),
 }
 #[derive(Clone, Debug)]
 pub struct Hit {
@@ -196,7 +199,7 @@ pub fn bar_with_settings(
     if settings.show_quick_buttons {
         left += c.p(6.);
         for (label, action) in [
-            ("테마", Action::Wallpaper),
+            ("테마", Action::QuickTheme),
             ("설정", Action::OpenSettings),
             ("단축키", Action::Sheet),
         ] {

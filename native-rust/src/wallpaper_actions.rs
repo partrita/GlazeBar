@@ -135,6 +135,7 @@ mod tests {
             palette: None,
             status: String::new(),
             open_dropdown: None,
+            preview_tab: Default::default(),
         };
         assert!(prepare(&p).is_err());
         p.enabled = false;

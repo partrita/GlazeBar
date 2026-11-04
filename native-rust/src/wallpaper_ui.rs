@@ -82,6 +82,7 @@ pub enum Action {
     Online,
     Folder,
     Target(usize),
+    PreviewTab(crate::theme_preview_ui::PreviewTab),
     Windows,
     Precache,
     Compare,
@@ -108,6 +109,7 @@ pub struct Picker {
     pub extra_targets: [bool; 12],
     pub windows: bool,
     pub options: crate::theme_windows::Options,
+    pub preview_tab: crate::theme_preview_ui::PreviewTab,
     pub busy: bool,
     pub palette: Option<crate::theme::Palette>,
     pub status: String,
@@ -184,6 +186,7 @@ impl Picker {
                     ..Default::default()
                 },
             ),
+            preview_tab: Default::default(),
             busy: false,
             palette: None,
             status: String::new(),
@@ -585,7 +588,29 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         }
     }
 
-    // Targets line (GlazeBar, Terminal, Codex CLI, VS Code, Windows)
+    // 프리뷰 탭 전환 버튼 (전체 / GlazeBar / Terminal / VS Code)
+    let preview_tabs = [
+        ("전체", crate::theme_preview_ui::PreviewTab::Overview),
+        ("GlazeBar", crate::theme_preview_ui::PreviewTab::GlazeBar),
+        ("Terminal", crate::theme_preview_ui::PreviewTab::Terminal),
+        ("VS Code", crate::theme_preview_ui::PreviewTab::VsCode),
+    ];
+    let tab_start_x = 24.;
+    let tab_w = 78.;
+    for (i, &(tab_label, tab_var)) in preview_tabs.iter().enumerate() {
+        button(
+            c,
+            &mut hits,
+            tab_label,
+            Rect::new(s(tab_start_x + (i as f64 * (tab_w + 6.))), palette_y + s(26.), s(tab_w), s(26.)),
+            p.preview_tab == tab_var,
+            Action::PreviewTab(tab_var),
+            hover,
+            p.busy,
+        );
+    }
+
+    // Targets line (동기화 타깃 토글 칩: GlazeBar, Terminal, Codex CLI, VS Code, Windows)
     let bottom_row1_y = h - s(84.);
     for (i, label) in ["GlazeBar", "Terminal", "Codex CLI", "VS Code"]
         .iter()
@@ -794,6 +819,7 @@ mod tests {
             palette: None,
             status: String::new(),
             open_dropdown: None,
+            preview_tab: Default::default(),
         };
         p.select(-1);
         assert_eq!(p.selected, 2);

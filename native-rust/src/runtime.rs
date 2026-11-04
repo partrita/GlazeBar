@@ -734,6 +734,39 @@ pub fn run_with_popup(
                             }
                         }
                     }
+                    "QuickTheme" => {
+                        wallpaper_worker.cancel();
+                        child_popup = None;
+                        if popup
+                            .as_ref()
+                            .is_some_and(|w| matches!(w.state.borrow().scene, Scene::QuickTheme(_)))
+                        {
+                            popup = None;
+                        } else {
+                            let (bounds, scale) = crate::native::centered_bounds(240., 340.);
+                            match Window::new(
+                                "GlazeBar · 빠른 테마",
+                                bounds,
+                                make_state(
+                                    &root,
+                                    scale,
+                                    Scene::QuickTheme(crate::quick_theme_ui::QuickTheme::default()),
+                                    true,
+                                    &ntx,
+                                ),
+                                null_mut(),
+                            ) {
+                                Ok(w) => {
+                                    w.show();
+                                    popup = Some(w);
+                                }
+                                Err(e) => {
+                                    result = Err(e);
+                                    break 'main;
+                                }
+                            }
+                        }
+                    }
                     "Settings" => {
                         wallpaper_worker.cancel();
                         child_popup = None;
@@ -1764,6 +1797,56 @@ pub fn run_with_popup(
                         }
                     }
                     Action::Wallpaper => send(&tx, thread, Update::Control("Wallpaper".into())),
+                    Action::QuickTheme => send(&tx, thread, Update::Control("QuickTheme".into())),
+                    Action::QuickThemeLight(light) => {
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::QuickTheme(qt) = &mut w.state.borrow_mut().scene {
+                                qt.light = light;
+                                w.invalidate();
+                            }
+                        }
+                    }
+                    Action::QuickThemeSelect(scheme_id) => {
+                        let mut target_scheme = None;
+                        let mut is_light = false;
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::QuickTheme(qt) = &mut w.state.borrow_mut().scene {
+                                qt.selected_scheme = scheme_id.clone();
+                                target_scheme = Some(scheme_id);
+                                is_light = qt.light;
+                                w.invalidate();
+                            }
+                        }
+                        if let Some(id) = target_scheme {
+                            if let Some(palette) = crate::color_schemes::palette(&id, is_light) {
+                                let bar_settings = crate::settings_ui::BarSettings::load(&root);
+                                let mut targets: Vec<String> = [
+                                    "glazebar", "terminal", "codex", "vscode", "rio", "zed",
+                                    "antigravity", "claude", "opencode", "firefox", "chrome",
+                                    "edge", "wezterm", "alacritty", "hyper", "putty",
+                                ]
+                                .into_iter()
+                                .zip(bar_settings.targets)
+                                .filter(|(_, enabled)| *enabled)
+                                .map(|(name, _)| name.into())
+                                .collect();
+                                if targets.is_empty() {
+                                    targets.push("glazebar".into());
+                                }
+                                let home = std::env::var_os("USERPROFILE")
+                                    .map(std::path::PathBuf::from)
+                                    .unwrap_or_else(|| root.clone());
+                                let request = crate::theme_transaction::Request {
+                                    action: "apply".into(),
+                                    light: is_light,
+                                    palette: palette.to_vec(),
+                                    targets,
+                                    ..Default::default()
+                                };
+                                let _ = crate::theme_transaction::run(&home, &request);
+                            }
+                        }
+                    }
                     Action::Picker(crate::wallpaper_ui::Action::Folder) => {
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
                             let allowed =
@@ -1911,6 +1994,10 @@ pub fn run_with_popup(
                                             if let Some(v) = p.targets.get_mut(i) {
                                                 *v = !*v;
                                             }
+                                            extract = false;
+                                        }
+                                        P::PreviewTab(tab) => {
+                                            p.preview_tab = tab;
                                             extract = false;
                                         }
                                         P::Close => {
@@ -2438,6 +2525,7 @@ pub fn run_with_popup(
                     crate::theme_preview_ui::Preview {
                         light: p.light,
                         palette: p.palette.clone(),
+                        tab: p.preview_tab,
                     },
                     s.scale,
                     s.palette,
