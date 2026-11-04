@@ -73,6 +73,7 @@ pub struct State {
     pub passive: bool,
     pub events: Sender<NativeEvent>,
     pub wake: usize,
+    pub bar_settings: Option<crate::settings_ui::BarSettings>,
 }
 impl State {
     fn send(&self, event: NativeEvent) {
@@ -115,7 +116,10 @@ impl State {
                 brightness,
                 weather,
             } => {
-                let bar_settings = crate::settings_ui::BarSettings::load(&self.root);
+                if self.bar_settings.is_none() {
+                    self.bar_settings = Some(crate::settings_ui::BarSettings::load(&self.root));
+                }
+                let bar_settings = self.bar_settings.as_ref().unwrap();
                 self.hits = views::bar_with_settings(
                     &mut c,
                     monitor,
@@ -126,7 +130,7 @@ impl State {
                     clock,
                     *brightness,
                     weather.as_ref().map(|(i, t)| (i.as_str(), t.as_str())),
-                    &bar_settings,
+                    bar_settings,
                 )
             }
             Scene::Scale {
@@ -973,6 +977,7 @@ pub fn preview(root: PathBuf, seconds: u64) -> anyhow::Result<()> {
         passive: false,
         events: tx,
         wake: 0,
+        bar_settings: None,
     };
     let w = (260. * monitor.scale).round_ties_even() as i32;
     let ht = (112. * monitor.scale).round_ties_even() as i32;
@@ -1057,6 +1062,7 @@ pub fn validate(root: PathBuf) -> anyhow::Result<()> {
             passive: false,
             events: tx,
             wake: 0,
+            bar_settings: None,
         },
         null_mut(),
     )?;
@@ -1200,6 +1206,7 @@ pub fn validate(root: PathBuf) -> anyhow::Result<()> {
             passive: false,
             events,
             wake: 0,
+            bar_settings: None,
         },
         handle,
     )?;

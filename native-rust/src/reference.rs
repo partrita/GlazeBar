@@ -70,6 +70,7 @@ pub fn render_wallhaven(root: &Path) -> anyhow::Result<()> {
                     passive: false,
                     events,
                     wake: 0,
+                    bar_settings: None,
                 },
                 std::ptr::null_mut(),
             )?;
@@ -262,6 +263,7 @@ pub fn render(root: &Path) -> anyhow::Result<()> {
                     passive: false,
                     events,
                     wake: 0,
+                    bar_settings: None,
                 },
                 std::ptr::null_mut(),
             )?;

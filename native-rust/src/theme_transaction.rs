@@ -614,10 +614,7 @@ impl Plan {
                     )?;
                     let init_lua = dir.join("init.lua");
                     let source = text_raw(&init_lua)?;
-                    plan.add(
-                        init_lua,
-                        theme_text::neovim_settings(&source).into_bytes(),
-                    )?;
+                    plan.add(init_lua, theme_text::neovim_settings(&source).into_bytes())?;
                 }
                 plan.applied.push("neovim".into());
             }
@@ -683,7 +680,10 @@ impl Plan {
         )?;
         if wanted("windows") {
             if !real_home {
-                if r.targets.iter().any(|t| canonical_target(t) == Some("windows")) {
+                if r.targets
+                    .iter()
+                    .any(|t| canonical_target(t) == Some("windows"))
+                {
                     ensure!(
                         real_home,
                         "Windows integration cannot use an overridden home"
@@ -1432,7 +1432,8 @@ mod tests {
         fs::create_dir_all(home.join(".config")).unwrap();
         fs::create_dir_all(home.join("AppData/Local/nvim")).unwrap();
         fs::create_dir_all(home.join("AppData/Roaming/bat")).unwrap();
-        fs::create_dir_all(home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/options")).unwrap();
+        fs::create_dir_all(home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/options"))
+            .unwrap();
         atomic_write(&home.join(".minttyrc"), b"Font=Consolas\n").unwrap();
         atomic_write(&home.join(".gitconfig"), b"[user]\nname=Test\n").unwrap();
 
@@ -1453,18 +1454,38 @@ mod tests {
 
         plan.apply_with(|_| Ok(())).unwrap();
 
-        assert!(home.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1").exists());
+        assert!(
+            home.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1")
+                .exists()
+        );
         assert!(home.join(".config/starship.toml").exists());
-        assert!(home.join("AppData/Local/nvim/colors/glazebar-aether.lua").exists());
+        assert!(
+            home.join("AppData/Local/nvim/colors/glazebar-aether.lua")
+                .exists()
+        );
         assert!(home.join("AppData/Local/nvim/init.lua").exists());
         assert!(home.join("AppData/Roaming/bat/config").exists());
-        assert!(home.join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme").exists());
-        assert!(home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/colors/glazebar-aether.icls").exists());
+        assert!(
+            home.join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme")
+                .exists()
+        );
+        assert!(
+            home.join("AppData/Roaming/JetBrains/IntelliJIdea2024.1/colors/glazebar-aether.icls")
+                .exists()
+        );
 
         restore_with(home, |_| Ok(())).unwrap();
 
-        assert!(!home.join("AppData/Local/nvim/colors/glazebar-aether.lua").exists());
-        assert!(!home.join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme").exists());
+        assert!(
+            !home
+                .join("AppData/Local/nvim/colors/glazebar-aether.lua")
+                .exists()
+        );
+        assert!(
+            !home
+                .join("AppData/Roaming/bat/themes/glazebar-aether.tmTheme")
+                .exists()
+        );
         let mintty_restored = fs::read_to_string(home.join(".minttyrc")).unwrap();
         assert_eq!(mintty_restored, "Font=Consolas\n");
     }

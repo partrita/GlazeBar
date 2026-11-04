@@ -182,7 +182,9 @@ impl BarSettings {
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default();
         s.weather_city = s.weather_city.min(CITIES.len().saturating_sub(1));
-        s.clock_format_idx = s.clock_format_idx.min(CLOCK_FORMATS.len().saturating_sub(1));
+        s.clock_format_idx = s
+            .clock_format_idx
+            .min(CLOCK_FORMATS.len().saturating_sub(1));
         s.opacity_idx = s.opacity_idx.min(OPACITY_STEPS.len().saturating_sub(1));
         s.terminal_idx = s.terminal_idx.min(TERMINALS.len().saturating_sub(1));
         s.browser_idx = s.browser_idx.min(BROWSERS.len().saturating_sub(1));
@@ -239,9 +241,7 @@ impl BarSettings {
             Edit::CycleClockFormat => {
                 self.clock_format_idx = (self.clock_format_idx + 1) % CLOCK_FORMATS.len()
             }
-            Edit::CycleOpacity => {
-                self.opacity_idx = (self.opacity_idx + 1) % OPACITY_STEPS.len()
-            }
+            Edit::CycleOpacity => self.opacity_idx = (self.opacity_idx + 1) % OPACITY_STEPS.len(),
             Edit::ToggleAutoSplit => self.auto_split = !self.auto_split,
             Edit::CycleTerminal => self.terminal_idx = (self.terminal_idx + 1) % TERMINALS.len(),
             Edit::CycleBrowser => self.browser_idx = (self.browser_idx + 1) % BROWSERS.len(),

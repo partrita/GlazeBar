@@ -214,6 +214,7 @@ fn make_state(
         passive,
         events: events.clone(),
         wake: 0,
+        bar_settings: None,
     }
 }
 fn scene(m: &ipc::Monitor, model: &Model, s: &Sensors) -> Scene {
@@ -448,13 +449,15 @@ pub fn run_with_popup(
             };
             let mut theme_signature = signature();
             while !stop.load(Ordering::Relaxed) {
-                if count % 2 == 0 {
+                // Poll theme metadata every 4th iteration (~4s) instead of every 1s
+                if count % 4 == 0 {
                     let current = signature();
                     if current != theme_signature {
                         theme_signature = current;
                         send(&tx, thread, Update::Theme(Palette::load(&theme_root)));
                     }
                 }
+                // Read system sensors every iteration (~1000ms) and hardware devices every 10th (~10s)
                 reader.read(&mut s, count % 10 == 0);
                 let next = visible_sensor_key(&s);
                 if key != next {
@@ -462,7 +465,7 @@ pub fn run_with_popup(
                     key = next;
                 }
                 count += 1;
-                std::thread::park_timeout(Duration::from_millis(500));
+                std::thread::park_timeout(Duration::from_millis(1000));
             }
         })
     };
@@ -1247,8 +1250,13 @@ pub fn run_with_popup(
                                             *brightness =
                                                 brightness_cache.get(&m.name).and_then(|v| v.0);
                                         }
-                                        let bar_settings = crate::settings_ui::BarSettings::load(&root);
-                                        window.set_opacity(crate::settings_ui::OPACITY_STEPS[bar_settings.opacity_idx].1);
+                                        let bar_settings =
+                                            crate::settings_ui::BarSettings::load(&root);
+                                        window.set_opacity(
+                                            crate::settings_ui::OPACITY_STEPS
+                                                [bar_settings.opacity_idx]
+                                                .1,
+                                        );
                                         let mut bar = Bar {
                                             window,
                                             registered: false,
@@ -1824,9 +1832,22 @@ pub fn run_with_popup(
                             if let Some(palette) = crate::color_schemes::palette(&id, is_light) {
                                 let bar_settings = crate::settings_ui::BarSettings::load(&root);
                                 let mut targets: Vec<String> = [
-                                    "glazebar", "terminal", "codex", "vscode", "rio", "zed",
-                                    "antigravity", "claude", "opencode", "firefox", "chrome",
-                                    "edge", "wezterm", "alacritty", "hyper", "putty",
+                                    "glazebar",
+                                    "terminal",
+                                    "codex",
+                                    "vscode",
+                                    "rio",
+                                    "zed",
+                                    "antigravity",
+                                    "claude",
+                                    "opencode",
+                                    "firefox",
+                                    "chrome",
+                                    "edge",
+                                    "wezterm",
+                                    "alacritty",
+                                    "hyper",
+                                    "putty",
                                 ]
                                 .into_iter()
                                 .zip(bar_settings.targets)
@@ -2055,13 +2076,15 @@ pub fn run_with_popup(
                                                 }
                                             }
                                             v.status =
-                                                "기본 편집기로 config.yaml 파일을 열었습니다.".into();
+                                                "기본 편집기로 config.yaml 파일을 열었습니다."
+                                                    .into();
                                         }
                                         E::ReloadGlazeWM => {
                                             let _ = v.save(&root);
                                             reload_wm = true;
                                             v.status =
-                                                "설정을 저장하고 GlazeWM에 다시 적용했습니다.".into();
+                                                "설정을 저장하고 GlazeWM에 다시 적용했습니다."
+                                                    .into();
                                         }
                                         E::OpenWallpaper => {
                                             let _ = v.save(&root);
@@ -2089,13 +2112,20 @@ pub fn run_with_popup(
                                             }
                                             if matches!(other, E::CycleOpacity) {
                                                 for b in bars.values() {
-                                                    b.window.set_opacity(crate::settings_ui::OPACITY_STEPS[v.opacity_idx].1);
+                                                    b.window.set_opacity(
+                                                        crate::settings_ui::OPACITY_STEPS
+                                                            [v.opacity_idx]
+                                                            .1,
+                                                    );
                                                 }
                                             }
                                             if matches!(other, E::CycleClockFormat) {
-                                                let new_clk = views::clock_formatted(v.clock_format_idx);
+                                                let new_clk =
+                                                    views::clock_formatted(v.clock_format_idx);
                                                 for b in bars.values() {
-                                                    if let Scene::Bar { clock: label, .. } = &mut b.window.state.borrow_mut().scene {
+                                                    if let Scene::Bar { clock: label, .. } =
+                                                        &mut b.window.state.borrow_mut().scene
+                                                    {
                                                         *label = new_clk.clone();
                                                     }
                                                 }
@@ -2111,13 +2141,17 @@ pub fn run_with_popup(
                             let _ = s.save(&root);
                             if matches!(&edit, crate::settings_ui::Edit::CycleOpacity) {
                                 for b in bars.values() {
-                                    b.window.set_opacity(crate::settings_ui::OPACITY_STEPS[s.opacity_idx].1);
+                                    b.window.set_opacity(
+                                        crate::settings_ui::OPACITY_STEPS[s.opacity_idx].1,
+                                    );
                                 }
                             }
                             if matches!(&edit, crate::settings_ui::Edit::CycleClockFormat) {
                                 let new_clk = views::clock_formatted(s.clock_format_idx);
                                 for b in bars.values() {
-                                    if let Scene::Bar { clock: label, .. } = &mut b.window.state.borrow_mut().scene {
+                                    if let Scene::Bar { clock: label, .. } =
+                                        &mut b.window.state.borrow_mut().scene
+                                    {
                                         *label = new_clk.clone();
                                     }
                                 }

@@ -682,7 +682,12 @@ if (Get-Module -ListAvailable -Name PSReadLine) {{\n\
 }}\n\
 # GLAZEBAR-THEME-END\n"
     );
-    replace_delimited_block_with(source, "# GLAZEBAR-THEME-START", "# GLAZEBAR-THEME-END", &block)
+    replace_delimited_block_with(
+        source,
+        "# GLAZEBAR-THEME-START",
+        "# GLAZEBAR-THEME-END",
+        &block,
+    )
 }
 
 pub fn starship_settings(source: &str, p: &Palette) -> String {
@@ -728,7 +733,12 @@ bright_white = \"{p15}\"\n\
         p14 = p[14],
         p15 = p[15],
     );
-    replace_delimited_block_with(source, "# GLAZEBAR-THEME-START", "# GLAZEBAR-THEME-END", &block)
+    replace_delimited_block_with(
+        source,
+        "# GLAZEBAR-THEME-START",
+        "# GLAZEBAR-THEME-END",
+        &block,
+    )
 }
 
 pub fn mintty_settings(source: &str, p: &Palette, light: bool) -> String {
@@ -779,7 +789,12 @@ BoldWhite={p15}\n\
         p14 = rgb_str(&p[14]),
         p15 = rgb_str(&p[15]),
     );
-    replace_delimited_block_with(source, "# GLAZEBAR-THEME-START", "# GLAZEBAR-THEME-END", &block)
+    replace_delimited_block_with(
+        source,
+        "# GLAZEBAR-THEME-START",
+        "# GLAZEBAR-THEME-END",
+        &block,
+    )
 }
 
 pub fn neovim_theme(p: &Palette, light: bool) -> String {
@@ -829,7 +844,12 @@ pub fn neovim_settings(source: &str) -> String {
 vim.opt.termguicolors = true\n\
 pcall(vim.cmd.colorscheme, \"glazebar-aether\")\n\
 -- GLAZEBAR-THEME-END\n";
-    replace_delimited_block_with(source, "-- GLAZEBAR-THEME-START", "-- GLAZEBAR-THEME-END", block)
+    replace_delimited_block_with(
+        source,
+        "-- GLAZEBAR-THEME-START",
+        "-- GLAZEBAR-THEME-END",
+        block,
+    )
 }
 
 pub fn bat_settings(source: &str, theme_name: &str) -> String {
@@ -838,7 +858,12 @@ pub fn bat_settings(source: &str, theme_name: &str) -> String {
 --theme=\"{theme_name}\"\n\
 # GLAZEBAR-THEME-END\n"
     );
-    replace_delimited_block_with(source, "# GLAZEBAR-THEME-START", "# GLAZEBAR-THEME-END", &block)
+    replace_delimited_block_with(
+        source,
+        "# GLAZEBAR-THEME-START",
+        "# GLAZEBAR-THEME-END",
+        &block,
+    )
 }
 
 pub fn delta_gitconfig(source: &str, p: &Palette, light: bool) -> String {
@@ -859,7 +884,12 @@ pub fn delta_gitconfig(source: &str, p: &Palette, light: bool) -> String {
         red = p[1],
         muted = p[8],
     );
-    replace_delimited_block_with(source, "# GLAZEBAR-THEME-START", "# GLAZEBAR-THEME-END", &block)
+    replace_delimited_block_with(
+        source,
+        "# GLAZEBAR-THEME-START",
+        "# GLAZEBAR-THEME-END",
+        &block,
+    )
 }
 
 pub fn jetbrains_color_scheme(p: &Palette, light: bool) -> String {

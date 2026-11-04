@@ -602,7 +602,12 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
             c,
             &mut hits,
             tab_label,
-            Rect::new(s(tab_start_x + (i as f64 * (tab_w + 6.))), palette_y + s(26.), s(tab_w), s(26.)),
+            Rect::new(
+                s(tab_start_x + (i as f64 * (tab_w + 6.))),
+                palette_y + s(26.),
+                s(tab_w),
+                s(26.),
+            ),
             p.preview_tab == tab_var,
             Action::PreviewTab(tab_var),
             hover,

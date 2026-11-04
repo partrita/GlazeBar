@@ -55,8 +55,22 @@ pub fn paint(c: &mut Canvas, state: &QuickTheme, hover: Option<(i32, i32)>) -> V
             blend(c.ui.surface, c.ui.text, 0.04)
         };
         c.fill(rect, bg);
-        c.frame(rect, if is_selected { c.ui.accent } else { c.ui.border });
-        c.text(label, rect, if is_selected { 0xffffffff } else { c.ui.text }, 11., is_selected, 1);
+        c.frame(
+            rect,
+            if is_selected {
+                c.ui.accent
+            } else {
+                c.ui.border
+            },
+        );
+        c.text(
+            label,
+            rect,
+            if is_selected { 0xffffffff } else { c.ui.text },
+            11.,
+            is_selected,
+            1,
+        );
         hits.push(Hit {
             rect,
             action: Action::QuickThemeLight(is_light),
@@ -89,15 +103,29 @@ pub fn paint(c: &mut Canvas, state: &QuickTheme, hover: Option<(i32, i32)>) -> V
         }
 
         // 테마 4색 칩 (배경, 액센트1, 액센트2, 액센트3)
-        let palette = if state.light { scheme.light } else { scheme.dark };
-        let chip_colors = [parse(palette[0]), parse(palette[4]), parse(palette[2]), parse(palette[5])];
+        let palette = if state.light {
+            scheme.light
+        } else {
+            scheme.dark
+        };
+        let chip_colors = [
+            parse(palette[0]),
+            parse(palette[4]),
+            parse(palette[2]),
+            parse(palette[5]),
+        ];
         let chip_size = p(10.);
         let chip_spacing = p(3.);
         let chip_start_x = p(18.);
         let chip_y = item_y + (item_h - p(4.) - chip_size) / 2;
 
         for (chip_idx, &col) in chip_colors.iter().enumerate() {
-            let chip_rect = Rect::new(chip_start_x + chip_idx as i32 * (chip_size + chip_spacing), chip_y, chip_size, chip_size);
+            let chip_rect = Rect::new(
+                chip_start_x + chip_idx as i32 * (chip_size + chip_spacing),
+                chip_y,
+                chip_size,
+                chip_size,
+            );
             c.fill(chip_rect, col);
             c.frame(chip_rect, blend(col, c.ui.border, 0.5));
         }
@@ -133,15 +161,29 @@ pub fn paint(c: &mut Canvas, state: &QuickTheme, hover: Option<(i32, i32)>) -> V
 
     // 하단 구분선 및 전체 설정 열기
     let footer_y = h - p(40.);
-    c.fill(Rect::new(p(14.), footer_y - p(4.), w - p(28.), 1), c.ui.border);
+    c.fill(
+        Rect::new(p(14.), footer_y - p(4.), w - p(28.), 1),
+        c.ui.border,
+    );
 
     let detail_rect = Rect::new(p(10.), footer_y, w - p(20.), p(32.));
     let detail_hover = hover.is_some_and(|(x, y)| detail_rect.contains(x, y));
-    c.fill(detail_rect, if detail_hover { blend(c.ui.surface, c.ui.text, 0.08) } else { c.ui.surface });
+    c.fill(
+        detail_rect,
+        if detail_hover {
+            blend(c.ui.surface, c.ui.text, 0.08)
+        } else {
+            c.ui.surface
+        },
+    );
     c.text(
         "배경화면 및 전체 테마 설정 ↗",
         detail_rect,
-        if detail_hover { c.ui.accent } else { c.ui.muted },
+        if detail_hover {
+            c.ui.accent
+        } else {
+            c.ui.muted
+        },
         11.5,
         false,
         1,

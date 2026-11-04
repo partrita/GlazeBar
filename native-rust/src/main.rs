@@ -183,7 +183,9 @@ fn run() -> anyhow::Result<()> {
                 .or_else(|| std::env::var_os("USERPROFILE").map(std::path::PathBuf::from))
                 .ok_or_else(|| anyhow::anyhow!("Home directory not found"))?;
 
-            let is_restore = args.iter().any(|a| a == "--restore" || a == "--theme-restore");
+            let is_restore = args
+                .iter()
+                .any(|a| a == "--restore" || a == "--theme-restore");
             if is_restore {
                 let req = theme_transaction::Request {
                     action: "restore".into(),
@@ -197,7 +199,10 @@ fn run() -> anyhow::Result<()> {
             let dry_run = args.iter().any(|a| a == "--dry-run");
             let action = if dry_run { "plan" } else { "apply" };
 
-            let preset_name = args.windows(2).find(|w| w[0] == "--preset").map(|w| w[1].as_str());
+            let preset_name = args
+                .windows(2)
+                .find(|w| w[0] == "--preset")
+                .map(|w| w[1].as_str());
             let force_light = args.iter().any(|a| a == "--light");
             let force_dark = args.iter().any(|a| a == "--dark");
 
@@ -221,8 +226,12 @@ fn run() -> anyhow::Result<()> {
                 color_schemes::palette(preset, light)
                     .map(|p| p.to_vec())
                     .ok_or_else(|| anyhow::anyhow!("Unknown preset: {preset}"))?
-            } else if let Some(p_val) = current_state.as_ref().and_then(|v| v["palette"].as_array()) {
-                p_val.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+            } else if let Some(p_val) = current_state.as_ref().and_then(|v| v["palette"].as_array())
+            {
+                p_val
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
             } else {
                 color_schemes::palette("catppuccin", light)
                     .map(|p| p.to_vec())
@@ -234,7 +243,8 @@ fn run() -> anyhow::Result<()> {
                 targets.push("all".into());
             } else {
                 for arg in args.iter().skip(2) {
-                    if !arg.starts_with('-') && !["theme", "apply", "sync"].contains(&arg.as_str()) {
+                    if !arg.starts_with('-') && !["theme", "apply", "sync"].contains(&arg.as_str())
+                    {
                         targets.push(arg.clone());
                     }
                 }

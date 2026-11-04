@@ -133,6 +133,7 @@ pub struct Resources {
     fonts: HashMap<(i32, bool), HFONT>,
     brushes: HashMap<Color, HBRUSH>,
     icons: HashMap<(String, i32, Color), resvg::tiny_skia::Pixmap>,
+    blended_icons: HashMap<(String, i32, Color, Color), Vec<u8>>,
 }
 impl Resources {
     pub fn new() -> Self {
@@ -140,6 +141,7 @@ impl Resources {
             fonts: HashMap::new(),
             brushes: HashMap::new(),
             icons: HashMap::new(),
+            blended_icons: HashMap::new(),
         }
     }
     pub(crate) fn font(&mut self, px: i32, bold: bool) -> HFONT {
@@ -313,9 +315,10 @@ impl Canvas<'_> {
             );
             self.resources.icons.insert(key.clone(), pixels);
         }
-        let pixels = &self.resources.icons[&key];
-        unsafe {
-            let bg = GetPixel(self.dc, r.x, r.y);
+        let bg = unsafe { GetPixel(self.dc, r.x, r.y) };
+        let blend_key = (name.to_string(), r.w, col, bg);
+        if !self.resources.blended_icons.contains_key(&blend_key) {
+            let pixels = &self.resources.icons[&key];
             let mut data = Vec::with_capacity(pixels.data().len());
             for p in pixels.data().chunks_exact(4) {
                 let a = p[3] as u32;
@@ -327,8 +330,10 @@ impl Canvas<'_> {
                 }
                 data.push(255);
             }
-            self.bitmap(r, r.w, r.h, &data);
+            self.resources.blended_icons.insert(blend_key.clone(), data);
         }
+        let data = &self.resources.blended_icons[&blend_key];
+        self.bitmap(r, r.w, r.h, data);
     }
     pub fn bitmap(&self, r: Rect, w: i32, h: i32, bgra: &[u8]) {
         let mut info = BITMAPINFO::default();
