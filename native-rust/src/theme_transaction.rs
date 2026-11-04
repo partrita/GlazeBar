@@ -682,17 +682,28 @@ impl Plan {
             json(&serde_json::json!({"name":theme::NAME,"image":r.image,"mode":if r.mode.is_empty(){"normal"}else{&r.mode},"light":r.light,"palette":p}))?,
         )?;
         if wanted("windows") {
-            ensure!(
-                real_home,
-                "Windows integration cannot use an overridden home"
-            );
-            let options = r
-                .windows
-                .as_ref()
-                .context("choose Windows integration options")?;
-            plan.changes
-                .extend(crate::theme_windows::plan(&p, r.light, options)?);
-            plan.applied.push("windows".into());
+            if !real_home {
+                if r.targets.iter().any(|t| canonical_target(t) == Some("windows")) {
+                    ensure!(
+                        real_home,
+                        "Windows integration cannot use an overridden home"
+                    );
+                } else {
+                    plan.skipped.push("windows".into());
+                }
+            } else {
+                let default_opts = crate::theme_windows::Options {
+                    mode: true,
+                    accent: true,
+                    titlebars: Some(true),
+                    taskbar: Some(true),
+                    transparency: Some(true),
+                };
+                let options = r.windows.as_ref().unwrap_or(&default_opts);
+                plan.changes
+                    .extend(crate::theme_windows::plan(&p, r.light, options)?);
+                plan.applied.push("windows".into());
+            }
         }
         Ok(plan)
     }
