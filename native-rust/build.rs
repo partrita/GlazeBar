@@ -6,13 +6,16 @@ fn main() {
         return;
     }
     let resource = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("glazebar.res");
-    let status = Command::new("rc.exe")
+    let Ok(status) = Command::new("rc.exe")
         .arg("/nologo")
         .arg("/fo")
         .arg(&resource)
         .arg("glazebar.rc")
         .status()
-        .expect("Windows SDK resource compiler (rc.exe) must be on PATH");
+    else {
+        println!("cargo:warning=rc.exe not found on PATH; skipping resource compilation");
+        return;
+    };
     assert!(
         status.success(),
         "Windows version resource compilation failed"

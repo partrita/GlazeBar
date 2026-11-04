@@ -13,6 +13,14 @@ pub fn rgb(hex: &str) -> [f64; 3] {
         (n & 255) as f64,
     ]
 }
+pub fn rgb_components(hex: &str) -> (u8, u8, u8) {
+    let n = u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(0);
+    (
+        ((n >> 16) & 255) as u8,
+        ((n >> 8) & 255) as u8,
+        (n & 255) as u8,
+    )
+}
 fn linear(c: f64) -> f64 {
     if c <= 0.04045 {
         c / 12.92

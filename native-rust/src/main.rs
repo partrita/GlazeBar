@@ -174,6 +174,92 @@ fn run() -> anyhow::Result<()> {
                 &theme_transaction::run(&home, &request)?,
             )?;
         }
+        Some("--theme-apply" | "--theme-sync" | "theme" | "--theme-restore") => {
+            let home = args
+                .windows(2)
+                .find(|w| w[0] == "--home")
+                .map(|w| std::path::PathBuf::from(&w[1]))
+                .or_else(|| std::env::var_os("USERPROFILE").map(std::path::PathBuf::from))
+                .ok_or_else(|| anyhow::anyhow!("Home directory not found"))?;
+
+            let is_restore = args.iter().any(|a| a == "--restore" || a == "--theme-restore");
+            if is_restore {
+                let req = theme_transaction::Request {
+                    action: "restore".into(),
+                    ..Default::default()
+                };
+                let resp = theme_transaction::run(&home, &req)?;
+                println!("{}", serde_json::to_string_pretty(&resp)?);
+                return Ok(());
+            }
+
+            let dry_run = args.iter().any(|a| a == "--dry-run");
+            let action = if dry_run { "plan" } else { "apply" };
+
+            let preset_name = args.windows(2).find(|w| w[0] == "--preset").map(|w| w[1].as_str());
+            let force_light = args.iter().any(|a| a == "--light");
+            let force_dark = args.iter().any(|a| a == "--dark");
+
+            let current_json_path = home.join(".glzr/glazewm/theme-state/current-palette.json");
+            let current_state: Option<serde_json::Value> = std::fs::read(&current_json_path)
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok());
+
+            let light = if force_light {
+                true
+            } else if force_dark {
+                false
+            } else {
+                current_state
+                    .as_ref()
+                    .and_then(|v| v["light"].as_bool())
+                    .unwrap_or(false)
+            };
+
+            let palette: Vec<String> = if let Some(preset) = preset_name {
+                color_schemes::palette(preset, light)
+                    .map(|p| p.to_vec())
+                    .ok_or_else(|| anyhow::anyhow!("Unknown preset: {preset}"))?
+            } else if let Some(p_val) = current_state.as_ref().and_then(|v| v["palette"].as_array()) {
+                p_val.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+            } else {
+                color_schemes::palette("catppuccin", light)
+                    .map(|p| p.to_vec())
+                    .unwrap_or_default()
+            };
+
+            let mut targets = vec![];
+            if args.iter().any(|a| a == "--all" || a == "all") {
+                targets.push("all".into());
+            } else {
+                for arg in args.iter().skip(2) {
+                    if !arg.starts_with('-') && !["theme", "apply", "sync"].contains(&arg.as_str()) {
+                        targets.push(arg.clone());
+                    }
+                }
+                if targets.is_empty() {
+                    targets.push("all".into());
+                }
+            }
+
+            let req = theme_transaction::Request {
+                action: action.into(),
+                palette,
+                light,
+                targets,
+                windows: Some(theme_windows::Options {
+                    mode: true,
+                    accent: true,
+                    titlebars: Some(true),
+                    taskbar: Some(true),
+                    transparency: Some(true),
+                }),
+                ..Default::default()
+            };
+
+            let resp = theme_transaction::run(&home, &req)?;
+            println!("{}", serde_json::to_string_pretty(&resp)?);
+        }
         Some("--theme-export-preview") => {
             let request: serde_json::Value = serde_json::from_reader(std::io::stdin())?;
             let colors: Vec<String> = serde_json::from_value(request["palette"].clone())?;

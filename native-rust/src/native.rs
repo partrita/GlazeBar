@@ -157,6 +157,25 @@ impl State {
         }
     }
 }
+pub fn apply_window_opacity(hwnd: HWND, opacity_pct: u8) {
+    unsafe {
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        let alpha = ((opacity_pct.clamp(20, 100) as u32 * 255) / 100) as u8;
+        if alpha >= 254 {
+            if (ex_style & WS_EX_LAYERED as i32) != 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style & !(WS_EX_LAYERED as i32));
+                InvalidateRect(hwnd, null(), 1);
+            }
+        } else {
+            if (ex_style & WS_EX_LAYERED as i32) == 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED as i32);
+            }
+            SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
+            InvalidateRect(hwnd, null(), 1);
+        }
+    }
+}
+
 pub struct Window {
     pub hwnd: HWND,
     pub state: Rc<RefCell<State>>,
@@ -232,6 +251,9 @@ impl Window {
         unsafe {
             InvalidateRect(self.hwnd, null(), 0);
         }
+    }
+    pub fn set_opacity(&self, opacity_pct: u8) {
+        apply_window_opacity(self.hwnd, opacity_pct);
     }
     pub fn owns_focus(&self, target: HWND) -> bool {
         unsafe {
