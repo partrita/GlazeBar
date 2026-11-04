@@ -21,7 +21,8 @@ impl Default for QuickTheme {
 
 pub fn paint(c: &mut Canvas, state: &QuickTheme, hover: Option<(i32, i32)>) -> Vec<Hit> {
     let mut hits = vec![];
-    let p = |v: f64| c.p(v);
+    let scale = c.scale;
+    let p = |v: f64| (v * scale).round_ties_even() as i32;
     let w = c.width;
     let h = c.height;
 

@@ -1818,19 +1818,33 @@ pub fn run_with_popup(
                             }
                         }
                         if let Some(id) = target_scheme {
-                            let bar_settings = crate::settings_ui::BarSettings::load(&root);
-                            let palette = crate::color_schemes::palette(&id, is_light);
-                            let plan = crate::wallpaper_actions::Plan {
-                                image: root.join("assets/current.png"),
-                                palette,
-                                light: is_light,
-                                targets: bar_settings.targets,
-                                extra_targets: [true; 12],
-                                windows: false,
-                                options: Default::default(),
-                                previous: None,
-                            };
-                            let _ = crate::wallpaper_actions::apply(&root, &plan);
+                            if let Some(palette) = crate::color_schemes::palette(&id, is_light) {
+                                let bar_settings = crate::settings_ui::BarSettings::load(&root);
+                                let mut targets: Vec<String> = [
+                                    "glazebar", "terminal", "codex", "vscode", "rio", "zed",
+                                    "antigravity", "claude", "opencode", "firefox", "chrome",
+                                    "edge", "wezterm", "alacritty", "hyper", "putty",
+                                ]
+                                .into_iter()
+                                .zip(bar_settings.targets)
+                                .filter(|(_, enabled)| *enabled)
+                                .map(|(name, _)| name.into())
+                                .collect();
+                                if targets.is_empty() {
+                                    targets.push("glazebar".into());
+                                }
+                                let home = std::env::var_os("USERPROFILE")
+                                    .map(std::path::PathBuf::from)
+                                    .unwrap_or_else(|| root.clone());
+                                let request = crate::theme_transaction::Request {
+                                    action: "apply".into(),
+                                    light: is_light,
+                                    palette: palette.to_vec(),
+                                    targets,
+                                    ..Default::default()
+                                };
+                                let _ = crate::theme_transaction::run(&home, &request);
+                            }
                         }
                     }
                     Action::Picker(crate::wallpaper_ui::Action::Folder) => {
