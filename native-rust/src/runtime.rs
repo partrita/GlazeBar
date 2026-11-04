@@ -734,6 +734,39 @@ pub fn run_with_popup(
                             }
                         }
                     }
+                    "QuickTheme" => {
+                        wallpaper_worker.cancel();
+                        child_popup = None;
+                        if popup
+                            .as_ref()
+                            .is_some_and(|w| matches!(w.state.borrow().scene, Scene::QuickTheme(_)))
+                        {
+                            popup = None;
+                        } else {
+                            let (bounds, scale) = crate::native::centered_bounds(240., 340.);
+                            match Window::new(
+                                "GlazeBar · 빠른 테마",
+                                bounds,
+                                make_state(
+                                    &root,
+                                    scale,
+                                    Scene::QuickTheme(crate::quick_theme_ui::QuickTheme::default()),
+                                    true,
+                                    &ntx,
+                                ),
+                                null_mut(),
+                            ) {
+                                Ok(w) => {
+                                    w.show();
+                                    popup = Some(w);
+                                }
+                                Err(e) => {
+                                    result = Err(e);
+                                    break 'main;
+                                }
+                            }
+                        }
+                    }
                     "Settings" => {
                         wallpaper_worker.cancel();
                         child_popup = None;
@@ -1764,6 +1797,42 @@ pub fn run_with_popup(
                         }
                     }
                     Action::Wallpaper => send(&tx, thread, Update::Control("Wallpaper".into())),
+                    Action::QuickTheme => send(&tx, thread, Update::Control("QuickTheme".into())),
+                    Action::QuickThemeLight(light) => {
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::QuickTheme(qt) = &mut w.state.borrow_mut().scene {
+                                qt.light = light;
+                                w.invalidate();
+                            }
+                        }
+                    }
+                    Action::QuickThemeSelect(scheme_id) => {
+                        let mut target_scheme = None;
+                        let mut is_light = false;
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::QuickTheme(qt) = &mut w.state.borrow_mut().scene {
+                                qt.selected_scheme = scheme_id.clone();
+                                target_scheme = Some(scheme_id);
+                                is_light = qt.light;
+                                w.invalidate();
+                            }
+                        }
+                        if let Some(id) = target_scheme {
+                            let bar_settings = crate::settings_ui::BarSettings::load(&root);
+                            let palette = crate::color_schemes::palette(&id, is_light);
+                            let plan = crate::wallpaper_actions::Plan {
+                                image: root.join("assets/current.png"),
+                                palette,
+                                light: is_light,
+                                targets: bar_settings.targets,
+                                extra_targets: [true; 12],
+                                windows: false,
+                                options: Default::default(),
+                                previous: None,
+                            };
+                            let _ = crate::wallpaper_actions::apply(&root, &plan);
+                        }
+                    }
                     Action::Picker(crate::wallpaper_ui::Action::Folder) => {
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
                             let allowed =
@@ -1911,6 +1980,10 @@ pub fn run_with_popup(
                                             if let Some(v) = p.targets.get_mut(i) {
                                                 *v = !*v;
                                             }
+                                            extract = false;
+                                        }
+                                        P::PreviewTab(tab) => {
+                                            p.preview_tab = tab;
                                             extract = false;
                                         }
                                         P::Close => {
@@ -2438,6 +2511,7 @@ pub fn run_with_popup(
                     crate::theme_preview_ui::Preview {
                         light: p.light,
                         palette: p.palette.clone(),
+                        tab: p.preview_tab,
                     },
                     s.scale,
                     s.palette,

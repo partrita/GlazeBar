@@ -19,6 +19,7 @@ mod palette_mono;
 mod palette_styles;
 mod pixel_sampler;
 mod quantize;
+mod quick_theme_ui;
 mod settings_ui;
 mod style_compare_ui;
 mod style_compare_worker;

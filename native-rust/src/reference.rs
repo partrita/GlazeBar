@@ -205,6 +205,7 @@ pub fn render(root: &Path) -> anyhow::Result<()> {
                         .try_into()
                         .map_err(|_| anyhow::anyhow!("Invalid palette"))?,
                 ),
+                tab: Default::default(),
             };
             save("theme-preview", 360., 590., &mut |c| {
                 crate::theme_preview_ui::paint(c, &preview)
