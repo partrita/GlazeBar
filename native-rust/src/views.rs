@@ -212,141 +212,181 @@ pub fn bar_with_settings(
         }
     }
     let mut right = c.width - c.p(18.);
-    if settings.show_weather {
-        if let Some((icon, text)) = weather {
-            metric(c, &mut right, &mut hits, icon, text, ui.muted, None);
-        }
-    }
-    if settings.show_battery && s.battery {
-        let mut vw = 0;
-        for d in 0..10 {
-            for sign in ["+", "−"] {
-                vw = vw.max(c.measure(&format!("{sign}{d}{d}.{d}"), 12.5, true));
+    let order = settings.normalized_widget_order();
+
+    for widget_id in order.iter() {
+        match widget_id.as_str() {
+            "weather" if settings.show_weather => {
+                if let Some((icon, text)) = weather {
+                    metric(c, &mut right, &mut hits, icon, text, ui.muted, None);
+                }
             }
-        }
-        let uw = c.measure("W", 12.5, false);
-        let r = Rect::new(right - c.p(26.) - vw - uw, 0, c.p(26.) + vw + uw, h);
-        let color = if s.charging {
-            ui.success
-        } else if s.discharging {
-            ui.warning
-        } else {
-            ui.muted
-        };
-        let value = if s.known {
-            format!(
-                "{}{:.1}",
-                if s.charging {
-                    "+"
+            "battery" if settings.show_battery && s.battery => {
+                let mut vw = 0;
+                for d in 0..10 {
+                    for sign in ["+", "−"] {
+                        vw = vw.max(c.measure(&format!("{sign}{d}{d}.{d}"), 12.5, true));
+                    }
+                }
+                let uw = c.measure("W", 12.5, false);
+                let r = Rect::new(right - c.p(26.) - vw - uw, 0, c.p(26.) + vw + uw, h);
+                let color = if s.charging {
+                    ui.success
                 } else if s.discharging {
-                    "−"
+                    ui.warning
                 } else {
-                    ""
-                },
-                s.watts
-            )
-        } else {
-            "—".into()
-        };
-        c.icon(
-            "zap",
-            Rect::new(r.x, (h - c.p(15.)) / 2, c.p(15.), c.p(15.)),
-            color,
-        );
-        c.text(
-            &value,
-            Rect::new(r.x + c.p(22.), 0, vw, h),
-            color,
-            12.5,
-            true,
-            2,
-        );
-        c.text(
-            "W",
-            Rect::new(r.x + c.p(26.) + vw, 0, uw, h),
-            color,
-            12.5,
-            false,
-            2,
-        );
-        hit(&mut hits, r, Action::Battery);
-        right = r.x - c.p(18.);
-        let icon = if s.percent >= 65. {
-            "battery-full"
-        } else if s.percent >= 30. {
-            "battery-medium"
-        } else if s.percent > 15. {
-            "battery-low"
-        } else {
-            "battery"
-        };
-        metric(
-            c,
-            &mut right,
-            &mut hits,
-            icon,
-            &format!("{:.0}%", s.percent),
-            ui.text,
-            Some(Action::Power),
-        );
+                    ui.muted
+                };
+                let value = if s.known {
+                    format!(
+                        "{}{:.1}",
+                        if s.charging {
+                            "+"
+                        } else if s.discharging {
+                            "−"
+                        } else {
+                            ""
+                        },
+                        s.watts
+                    )
+                } else {
+                    "—".into()
+                };
+                c.icon(
+                    "zap",
+                    Rect::new(r.x, (h - c.p(15.)) / 2, c.p(15.), c.p(15.)),
+                    color,
+                );
+                c.text(
+                    &value,
+                    Rect::new(r.x + c.p(22.), 0, vw, h),
+                    color,
+                    12.5,
+                    true,
+                    2,
+                );
+                c.text(
+                    "W",
+                    Rect::new(r.x + c.p(26.) + vw, 0, uw, h),
+                    color,
+                    12.5,
+                    false,
+                    2,
+                );
+                hit(&mut hits, r, Action::Battery);
+                right = r.x - c.p(18.);
+                let icon = if s.percent >= 65. {
+                    "battery-full"
+                } else if s.percent >= 30. {
+                    "battery-medium"
+                } else if s.percent > 15. {
+                    "battery-low"
+                } else {
+                    "battery"
+                };
+                metric(
+                    c,
+                    &mut right,
+                    &mut hits,
+                    icon,
+                    &format!("{:.0}%", s.percent),
+                    ui.text,
+                    Some(Action::Power),
+                );
+            }
+            "cpu" if settings.show_cpu => {
+                metric(
+                    c,
+                    &mut right,
+                    &mut hits,
+                    "cpu",
+                    &format!("{:.0}%", s.cpu),
+                    ui.text,
+                    None,
+                );
+            }
+            "memory" if settings.show_memory => {
+                metric(
+                    c,
+                    &mut right,
+                    &mut hits,
+                    "memory-stick",
+                    &format!("{:.0}%", s.memory),
+                    ui.text,
+                    None,
+                );
+            }
+            "wifi" if settings.show_wifi && s.wifi_available => {
+                let network = if s.network.is_empty() {
+                    "Wi-Fi".to_string()
+                } else if s.network.chars().count() > 24 {
+                    format!("{}…", s.network.chars().take(23).collect::<String>())
+                } else {
+                    s.network.clone()
+                };
+                metric(
+                    c,
+                    &mut right,
+                    &mut hits,
+                    "wifi",
+                    &network,
+                    ui.muted,
+                    Some(Action::Wifi),
+                );
+            }
+            "tiling" => {
+                let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));
+                c.fill(r, ui.hover);
+                c.icon(
+                    if vertical {
+                        "arrow-up-down"
+                    } else {
+                        "arrow-left-right"
+                    },
+                    Rect::new(r.x + c.p(7.), r.y + c.p(4.), c.p(16.), c.p(16.)),
+                    ui.text,
+                );
+                hit(
+                    &mut hits,
+                    r,
+                    Action::Command("toggle-tiling-direction".into()),
+                );
+                right = r.x - c.p(12.);
+            }
+            "clock" => {
+                let dw = c.measure(clock, 12.5, true);
+                let cr = Rect::new(right - dw - c.p(8.), 0, dw + c.p(8.), h);
+                c.text(clock, cr, ui.text, 12.5, true, 1);
+                hit(
+                    &mut hits,
+                    cr,
+                    Action::Settings(crate::settings_ui::Edit::CycleClockFormat),
+                );
+                right = cr.x - c.p(12.);
+            }
+            "scale" if settings.show_scale => {
+                let sr = Rect::new(right - c.p(28.), (h - c.p(28.)) / 2, c.p(28.), c.p(28.));
+                c.fill(sr, ui.surface);
+                c.icon(
+                    "scaling",
+                    Rect::new(sr.x + c.p(6.), sr.y + c.p(6.), c.p(16.), c.p(16.)),
+                    ui.muted,
+                );
+                hit(&mut hits, sr, Action::Scale);
+                right = sr.x - c.p(12.);
+            }
+            "brightness" if settings.show_brightness => {
+                let br = Rect::new(right - c.p(150.), 0, c.p(150.), h);
+                paint_brightness(c, br, brightness);
+                if brightness.is_some() {
+                    hit(&mut hits, br, Action::Brightness);
+                }
+                right = br.x - c.p(12.);
+            }
+            _ => {}
+        }
     }
-    if settings.show_cpu {
-        metric(
-            c,
-            &mut right,
-            &mut hits,
-            "cpu",
-            &format!("{:.0}%", s.cpu),
-            ui.text,
-            None,
-        );
-    }
-    if settings.show_memory {
-        metric(
-            c,
-            &mut right,
-            &mut hits,
-            "memory-stick",
-            &format!("{:.0}%", s.memory),
-            ui.text,
-            None,
-        );
-    }
-    if settings.show_wifi && s.wifi_available {
-        let network = if s.network.is_empty() {
-            "Wi-Fi".to_string()
-        } else if s.network.chars().count() > 24 {
-            format!("{}…", s.network.chars().take(23).collect::<String>())
-        } else {
-            s.network.clone()
-        };
-        metric(
-            c,
-            &mut right,
-            &mut hits,
-            "wifi",
-            &network,
-            ui.muted,
-            Some(Action::Wifi),
-        );
-    }
-    let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));
-    c.fill(r, ui.hover);
-    c.icon(
-        if vertical {
-            "arrow-up-down"
-        } else {
-            "arrow-left-right"
-        },
-        Rect::new(r.x + c.p(7.), r.y + c.p(4.), c.p(16.), c.p(16.)),
-        ui.text,
-    );
-    hit(
-        &mut hits,
-        r,
-        Action::Command("toggle-tiling-direction".into()),
-    );
-    right = r.x - c.p(12.);
+
     if paused {
         let r = Rect::new(right - c.p(78.), c.p(8.), c.p(78.), h - c.p(16.));
         button(
@@ -372,37 +412,6 @@ pub fn bar_with_settings(
             true,
             Action::Command("wm-disable-binding-mode --name resize".into()),
         );
-    }
-    let dw = c.measure(clock, 12.5, true);
-    let dx = (c.width - dw) / 2;
-    let clock_rect = Rect::new(dx, 0, dw, h);
-    c.text(clock, clock_rect, ui.text, 12.5, true, 0);
-    hit(
-        &mut hits,
-        Rect::new(dx - c.p(6.), 0, dw + c.p(12.), h),
-        Action::Settings(crate::settings_ui::Edit::CycleClockFormat),
-    );
-    let sr = Rect::new(dx - c.p(40.), (h - c.p(28.)) / 2, c.p(28.), c.p(28.));
-    if settings.show_scale && sr.x > left {
-        c.fill(sr, ui.surface);
-        c.icon(
-            "scaling",
-            Rect::new(sr.x + c.p(6.), sr.y + c.p(6.), c.p(16.), c.p(16.)),
-            ui.muted,
-        );
-        hit(&mut hits, sr, Action::Scale);
-    }
-    let br_right = if settings.show_scale {
-        sr.x
-    } else {
-        dx - c.p(12.)
-    };
-    let br = Rect::new(br_right - c.p(162.), 0, c.p(150.), h);
-    if settings.show_brightness && br.x > left {
-        paint_brightness(c, br, brightness);
-        if brightness.is_some() {
-            hit(&mut hits, br, Action::Brightness);
-        }
     }
     let is_transparent = crate::settings_ui::OPACITY_STEPS
         .get(settings.opacity_idx)

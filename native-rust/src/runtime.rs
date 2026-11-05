@@ -866,6 +866,7 @@ pub fn run_with_popup(
                     }
                     let palette = Palette::load(&root);
                     for bar in bars.values() {
+                        bar.window.state.borrow_mut().bar_settings = None;
                         bar.window.state.borrow_mut().palette = palette;
                         bar.window.invalidate();
                     }
@@ -1810,10 +1811,60 @@ pub fn run_with_popup(
                     Action::Wallpaper => send(&tx, thread, Update::Control("Wallpaper".into())),
                     Action::QuickTheme => send(&tx, thread, Update::Control("QuickTheme".into())),
                     Action::QuickThemeLight(light) => {
+                        let mut target_scheme = None;
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
                             if let Scene::QuickTheme(qt) = &mut w.state.borrow_mut().scene {
                                 qt.light = light;
+                                target_scheme = Some(qt.selected_scheme.clone());
                                 w.invalidate();
+                            }
+                        }
+                        if let Some(id) = target_scheme {
+                            if let Some(palette) = crate::color_schemes::palette(&id, light) {
+                                let bar_settings = crate::settings_ui::BarSettings::load(&root);
+                                let mut targets: Vec<String> = [
+                                    "glazebar",
+                                    "terminal",
+                                    "codex",
+                                    "vscode",
+                                    "rio",
+                                    "zed",
+                                    "antigravity",
+                                    "claude",
+                                    "opencode",
+                                    "firefox",
+                                    "chrome",
+                                    "edge",
+                                    "wezterm",
+                                    "alacritty",
+                                    "hyper",
+                                    "putty",
+                                ]
+                                .into_iter()
+                                .zip(bar_settings.targets)
+                                .filter(|(_, enabled)| *enabled)
+                                .map(|(name, _)| name.into())
+                                .collect();
+                                if targets.is_empty() {
+                                    targets.push("glazebar".into());
+                                }
+                                let home = std::env::var_os("USERPROFILE")
+                                    .map(std::path::PathBuf::from)
+                                    .unwrap_or_else(|| root.clone());
+                                let request = crate::theme_transaction::Request {
+                                    action: "apply".into(),
+                                    light,
+                                    palette: palette.to_vec(),
+                                    targets,
+                                    ..Default::default()
+                                };
+                                let _ = crate::theme_transaction::run(&home, &request);
+                                for bar in bars.values() {
+                                    bar.window.state.borrow_mut().bar_settings = None;
+                                    bar.window.state.borrow_mut().palette =
+                                        crate::graphics::Palette::load(&root);
+                                    bar.window.invalidate();
+                                }
                             }
                         }
                     }
@@ -1868,6 +1919,12 @@ pub fn run_with_popup(
                                     ..Default::default()
                                 };
                                 let _ = crate::theme_transaction::run(&home, &request);
+                                for bar in bars.values() {
+                                    bar.window.state.borrow_mut().bar_settings = None;
+                                    bar.window.state.borrow_mut().palette =
+                                        crate::graphics::Palette::load(&root);
+                                    bar.window.invalidate();
+                                }
                             }
                         }
                     }
@@ -2165,6 +2222,7 @@ pub fn run_with_popup(
                         }
                         request_refresh(&work_tx, &pending);
                         for bar in bars.values() {
+                            bar.window.state.borrow_mut().bar_settings = None;
                             bar.window.invalidate();
                         }
                         if close_settings {

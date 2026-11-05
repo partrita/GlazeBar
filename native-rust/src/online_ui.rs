@@ -158,6 +158,18 @@ pub fn paint(c: &mut Canvas, v: &Online, hover: Option<(i32, i32)>) -> Vec<Hit> 
         false,
         0,
     );
+    // 닫기 ✕ 버튼
+    let close_rect = Rect::new(c.width - s(62.), s(17.), s(52.), s(32.));
+    views::button(
+        c,
+        &mut hits,
+        "닫기 ✕",
+        close_rect,
+        false,
+        hover.is_some_and(|(x, y)| close_rect.contains(x, y)),
+        true,
+        Action::Close,
+    );
     let mut button =
         |c: &mut Canvas, text: &str, r: Rect, selected: bool, enabled: bool, edit: Edit| {
             views::button(
@@ -174,7 +186,7 @@ pub fn paint(c: &mut Canvas, v: &Online, hover: Option<(i32, i32)>) -> Vec<Hit> 
     button(
         c,
         "검색",
-        Rect::new(c.width - s(106.), s(17.), s(84.), s(32.)),
+        Rect::new(c.width - s(152.), s(17.), s(84.), s(32.)),
         false,
         !v.downloading,
         Edit::Search(true),
@@ -182,7 +194,7 @@ pub fn paint(c: &mut Canvas, v: &Online, hover: Option<(i32, i32)>) -> Vec<Hit> 
     button(
         c,
         "새로고침",
-        Rect::new(c.width - s(202.), s(17.), s(88.), s(32.)),
+        Rect::new(c.width - s(248.), s(17.), s(88.), s(32.)),
         false,
         !v.downloading,
         Edit::Refresh,

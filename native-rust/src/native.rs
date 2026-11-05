@@ -386,7 +386,7 @@ impl Window {
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL as u32,
                 p(145.),
                 p(18.),
-                self.rect().w - p(368.),
+                self.rect().w - p(410.),
                 p(30.),
                 self.hwnd,
                 101usize as HMENU,
