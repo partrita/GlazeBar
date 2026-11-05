@@ -74,8 +74,7 @@ GlazeBar는 x64 및 ARM64(Copilot+ PC, Snapdragon X) 아키텍처를 네이티�
 - 전원 모드 전환: 고성능, 균형, 절전 구성표를 표시줄 팝업에서 원클릭으로 변경.
 
 ### 3. 지능형 테마 동기화 엔진 (Dynamic Theme Ecosystem)
-- 사진 기반 팔레트 추출: [Aether](https://github.com/omacom/aether) 알고리즘 기반으로 배경화면 이미지에서 6가지 조화 스타일의 색상 팔레트 자동 추출.
-- 대표 개발자 컬러 스킴 지원: Catppuccin, Everforest, Rosé Pine, Monokai, Dracula, Tokyo Night 등 검증된 컬러 스킴 원클릭 적용.
+- 정의된 컬러 스킴 선택: Catppuccin, Everforest, Rosé Pine, Monokai, Dracula, Tokyo Night 등 검증된 컬러 스킴을 다크·라이트 모드로 즉시 적용.
 - Wallhaven 연동 탐색기: 데스크톱 내에서 고해상도 배경화면 검색, 필터링, 다운로드 및 캐싱 지원.
 
 
@@ -86,7 +85,7 @@ GlazeBar에서 테마를 변경하면 시스템에 설치된 주요 개발 도�
 
 ```mermaid
 flowchart TD
-    GB[GlazeBar 테마 엔진\n사진 추출 / 컬러 스킴] -->|Direct2D / Win32| OS[Windows 11 OS\n강조색 / 다크·라이트 / 타이틀바]
+    GB[GlazeBar 테마 엔진\n정의된 컬러 스킴] -->|Direct2D / Win32| OS[Windows 11 OS\n강조색 / 다크·라이트 / 타이틀바]
     GB -->|Config Sync| EDITORS[개발 에디터 & IDE\nVS Code / Zed / Neovim / JetBrains / OpenCode / Codex]
     GB -->|Color Palette| TERMS[터미널 & 셸\nWindows Terminal / WezTerm / Alacritty / Rio / Hyper / PuTTY / Git Bash / PowerShell / Starship]
     GB -->|Tools & Pagers| TOOLS[CLI 도구\nBat / Delta / Antigravity / Claude Code]

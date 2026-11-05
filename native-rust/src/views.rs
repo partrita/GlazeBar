@@ -336,7 +336,6 @@ pub fn bar_with_settings(
             }
             "tiling" => {
                 let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));
-                c.fill(r, ui.hover);
                 c.icon(
                     if vertical {
                         "arrow-up-down"
@@ -509,6 +508,112 @@ pub fn button(
         hit(hits, r, action)
     }
 }
+#[derive(Clone, Debug, PartialEq)]
+pub struct DropdownOption {
+    pub label: String,
+    pub selected: bool,
+    pub swatch: Option<u32>,
+}
+
+impl DropdownOption {
+    pub fn new(label: impl Into<String>, selected: bool) -> Self {
+        Self {
+            label: label.into(),
+            selected,
+            swatch: None,
+        }
+    }
+    pub fn swatch(mut self, color: u32) -> Self {
+        self.swatch = Some(color);
+        self
+    }
+}
+
+/// Renders the shared dropdown menu and returns its item hit rects plus the
+/// full-window dismiss rect.
+///
+/// Item rects come first so clicks reach the menu even though the dismiss
+/// target follows them. Screens append their existing hits after the dismiss
+/// target, which keeps it above the underlying controls.
+pub fn dropdown(
+    c: &mut Canvas,
+    anchor: Rect,
+    options: &[DropdownOption],
+    hover: Option<(i32, i32)>,
+) -> (Vec<(Rect, usize)>, Rect) {
+    let scale = c.scale;
+    let s = |n: f64| (n * scale).round_ties_even() as i32;
+    let pad = s(4.);
+    let item_h = s(26.);
+    let mut menu_w = anchor.w.max(s(200.));
+    for option in options {
+        let mut width = s(32.);
+        if option.swatch.is_some() {
+            width += s(18.);
+        }
+        width += c.measure(&option.label, 11.5, false);
+        menu_w = menu_w.max(width + s(20.));
+    }
+    let menu_w = menu_w.min(c.width - 2 * pad);
+    let menu_h = item_h * options.len() as i32 + 2 * pad;
+    let menu_x = anchor.x.clamp(pad, (c.width - pad - menu_w).max(pad));
+    let menu_y = if anchor.y + anchor.h + s(2.) + menu_h <= c.height - pad {
+        anchor.y + anchor.h + s(2.)
+    } else {
+        (anchor.y - menu_h - s(2.)).max(pad)
+    };
+    let menu = Rect::new(menu_x, menu_y, menu_w, menu_h);
+    c.fill(menu, c.ui.surface);
+    c.frame(menu, c.ui.border);
+
+    let mut hits = Vec::with_capacity(options.len());
+    for (index, option) in options.iter().enumerate() {
+        let r = Rect::new(
+            menu_x + pad,
+            menu_y + pad + index as i32 * item_h,
+            menu_w - 2 * pad,
+            item_h,
+        );
+        if option.selected {
+            c.fill(r, c.ui.selected);
+        } else if hover.is_some_and(|(x, y)| r.contains(x, y)) {
+            c.fill(r, c.ui.hover);
+        }
+        if option.selected {
+            c.text(
+                "✓",
+                Rect::new(r.x + s(6.), r.y, s(14.), r.h),
+                c.ui.accent,
+                11.5,
+                true,
+                0,
+            );
+        }
+        let mut text_x = r.x + s(24.);
+        if let Some(color) = option.swatch {
+            let chip = s(10.);
+            let chip_rect = Rect::new(text_x, r.y + (r.h - chip) / 2, chip, chip);
+            c.fill(chip_rect, color);
+            c.frame(chip_rect, crate::graphics::blend(color, c.ui.border, 0.5));
+            text_x += chip + s(8.);
+        }
+        c.text(
+            &option.label,
+            Rect::new(text_x, r.y, r.x + r.w - text_x - s(8.), r.h),
+            if option.selected {
+                c.ui.accent
+            } else {
+                c.ui.text
+            },
+            11.5,
+            option.selected,
+            0,
+        );
+        hits.push((r, index));
+    }
+    (hits, Rect::new(0, 0, c.width, c.height))
+}
+
 pub fn paint_brightness(c: &mut Canvas, r: Rect, value: Option<u8>) {
     let ui = c.ui;
     let cy = r.y + r.h / 2;

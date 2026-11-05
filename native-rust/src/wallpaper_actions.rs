@@ -12,10 +12,11 @@ pub fn prepare(p: &crate::wallpaper_ui::Picker) -> Result<(PathBuf, Option<Reque
     if !p.enabled {
         return Ok((path, None));
     }
-    let palette = p
-        .palette
-        .as_ref()
-        .ok_or_else(|| anyhow!("색상 추출이 끝난 뒤 적용해주세요"))?;
+    let mode =
+        crate::wallpaper_ui::SCHEME_IDS[p.mode.min(crate::wallpaper_ui::SCHEME_IDS.len() - 1)];
+    let palette = crate::color_schemes::palette(mode, p.light)
+        .or_else(|| p.palette.clone())
+        .ok_or_else(|| anyhow!("테마 팔레트를 불러올 수 없습니다"))?;
     let mut targets: Vec<String> = ["glazebar", "terminal", "codex", "vscode"]
         .into_iter()
         .zip(p.targets)
@@ -52,9 +53,7 @@ pub fn prepare(p: &crate::wallpaper_ui::Picker) -> Result<(PathBuf, Option<Reque
         Some(Request {
             action: "apply".into(),
             image: path.to_string_lossy().into_owned(),
-            mode: crate::wallpaper_ui::ALL_MODES
-                [p.mode.min(crate::wallpaper_ui::ALL_MODES.len() - 1)]
-            .into(),
+            mode: mode.into(),
             light: p.light,
             palette: palette.to_vec(),
             targets,
@@ -113,7 +112,7 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
     #[test]
-    fn picker_request_respects_targets_and_pending_palette() {
+    fn picker_request_respects_targets_and_scheme_palette() {
         let mut p = crate::wallpaper_ui::Picker {
             operation: 0,
             revision: 0,
@@ -137,7 +136,6 @@ mod tests {
             open_dropdown: None,
             preview_tab: Default::default(),
         };
-        assert!(prepare(&p).is_err());
         p.enabled = false;
         assert!(prepare(&p).unwrap().1.is_none());
         p.enabled = true;
@@ -145,7 +143,7 @@ mod tests {
         let (_, request) = prepare(&p).unwrap();
         let request = request.unwrap();
         assert_eq!(request.targets, vec!["terminal", "vscode", "windows"]);
-        assert_eq!(request.mode, "muted");
+        assert_eq!(request.mode, "everforest");
         assert!(request.light);
         assert_eq!(request.windows.unwrap().transparency, Some(false));
         p.extra_targets = [true; 12];

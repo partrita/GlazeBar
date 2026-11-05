@@ -100,7 +100,7 @@ pub fn paint(c: &mut Canvas, v: &Settings, hover: Option<(i32, i32)>) -> Vec<Hit
     toggle(
         c,
         &mut hits,
-        "배경화면 적용 시 Windows도 함께 변경",
+        "배경화면과 테마 적용 시 Windows도 함께 변경",
         Rect::new(s(24.), s(68.), s(460.), s(30.)),
         v.enabled,
         Edit::Enabled,
@@ -113,7 +113,7 @@ pub fn paint(c: &mut Canvas, v: &Settings, hover: Option<(i32, i32)>) -> Vec<Hit
             Edit::Mode,
         ),
         (
-            "사진에서 추출한 강조색 적용",
+            "선택한 테마의 강조색 적용",
             150.,
             v.options.accent,
             Edit::Accent,
@@ -167,7 +167,7 @@ pub fn paint(c: &mut Canvas, v: &Settings, hover: Option<(i32, i32)>) -> Vec<Hit
     }
     c.text(
         if v.status.is_empty() {
-            "작업 표시줄 강조색은 Windows 다크 모드에서 사용할 수 있습니다"
+            "작업 표시줄 강조색은 선택한 테마 기준으로 Windows 다크 모드에서 사용할 수 있습니다"
         } else {
             &v.status
         },

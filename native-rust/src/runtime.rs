@@ -1062,8 +1062,7 @@ pub fn run_with_popup(
                                         match result {
                                             Ok(palette) => {
                                                 p.palette = Some(palette);
-                                                if !p.busy && p.status == "Aether 색상 추출 중…"
-                                                {
+                                                if !p.busy {
                                                     p.status.clear();
                                                 }
                                             }
@@ -1664,7 +1663,7 @@ pub fn run_with_popup(
                                 child_popup = None;
                                 let (bounds, scale) = crate::native::centered_bounds(1120., 680.);
                                 match Window::new(
-                                    "GlazeBar · 스타일 비교",
+                                    "GlazeBar · 테마 비교",
                                     bounds,
                                     make_state(
                                         &root,
@@ -1706,12 +1705,6 @@ pub fn run_with_popup(
                                     crate::style_compare_ui::Edit::Light(light) => {
                                         if v.light != light {
                                             v.light = light;
-                                            compare_worker.request(hwnd, v);
-                                        }
-                                    }
-                                    crate::style_compare_ui::Edit::Presets(presets) => {
-                                        if v.presets != presets {
-                                            v.presets = presets;
                                             compare_worker.request(hwnd, v);
                                         }
                                     }
@@ -2747,7 +2740,7 @@ pub fn run_with_popup(
                 let ready = {
                     let state = w.state.borrow();
                     if let Scene::Wallpaper(p) = &state.scene {
-                        let _=std::fs::write(root.join("rust-shadow-wallpaper.json"),serde_json::to_vec_pretty(&serde_json::json!({"pid":std::process::id(),"files":p.files.len(),"selected":p.selected,"loaded":p.loaded.len(),"paletteReady":p.palette.is_some(),"status":p.status,"hits":state.hits.len(),"mode":crate::wallpaper_ui::ALL_MODES[p.mode.min(crate::wallpaper_ui::ALL_MODES.len()-1)],"light":p.light})).unwrap());
+                        let _=std::fs::write(root.join("rust-shadow-wallpaper.json"),serde_json::to_vec_pretty(&serde_json::json!({"pid":std::process::id(),"files":p.files.len(),"selected":p.selected,"loaded":p.loaded.len(),"paletteReady":p.palette.is_some(),"status":p.status,"hits":state.hits.len(),"mode":crate::wallpaper_ui::SCHEME_IDS[p.mode.min(crate::wallpaper_ui::SCHEME_IDS.len()-1)],"light":p.light})).unwrap());
                         p.palette.is_some()
                             && p.neighbors().iter().all(|path| p.loaded.contains(path))
                     } else {

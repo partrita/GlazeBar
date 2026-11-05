@@ -8,43 +8,30 @@ use std::path::PathBuf;
 pub enum Edit {
     Choose(usize),
     Light(bool),
-    Presets(bool),
 }
 #[derive(Clone)]
 pub struct Comparison {
-    pub image: PathBuf,
     pub palettes: [Option<Palette>; 6],
     pub selected: usize,
     pub light: bool,
-    pub presets: bool,
     pub revision: u64,
     pub status: String,
 }
 impl Comparison {
-    pub fn new(image: PathBuf, selected_mode: usize, light: bool) -> Self {
-        let presets = selected_mode >= 6;
-        let selected = if presets {
-            (selected_mode - 6).min(5)
-        } else {
-            selected_mode.min(5)
-        };
+    pub fn new(_image: PathBuf, selected_mode: usize, light: bool) -> Self {
         let mut s = Self {
-            image,
             palettes: Default::default(),
-            selected,
+            selected: selected_mode.min(5),
             light,
-            presets,
             revision: 0,
             status: String::new(),
         };
-        if presets {
-            s.fill_presets();
-        }
+        s.fill_presets();
         s
     }
     pub fn fill_presets(&mut self) {
         self.palettes = std::array::from_fn(|i| {
-            crate::color_schemes::palette(crate::wallpaper_ui::PRESET_MODES[i], self.light)
+            crate::color_schemes::palette(crate::wallpaper_ui::SCHEME_IDS[i], self.light)
         });
         self.status.clear();
     }
@@ -52,31 +39,15 @@ impl Comparison {
         self.selected = (self.selected as i64 + i64::from(delta)).rem_euclid(6) as usize;
     }
     pub fn mode_index(&self, card_index: usize) -> usize {
-        if self.presets {
-            card_index.min(5) + 6
-        } else {
-            card_index.min(5)
-        }
+        card_index.min(5)
     }
 }
-const DESCRIPTIONS: [&str; 6] = [
-    "사진 색감 우선 · 배경과 통일감",
-    "낮은 채도 · 절제된 코드 강조",
-    "부드러운 강조색 · 은은한 구문 구분",
-    "중립 배경 · 일상 코딩 추천",
-    "높은 채도 · 또렷한 구문 강조",
-    "강한 명암 대비 · 글자 가독성 우선",
-];
 pub fn paint(c: &mut Canvas, v: &Comparison, hover: Option<(i32, i32)>) -> Vec<Hit> {
     let mut hits = vec![];
     let scale = c.scale;
     let s = |n: f64| (n * scale).round_ties_even() as i32;
     c.text(
-        if v.presets {
-            "유명 컬러 스킴 비교"
-        } else {
-            "스타일 비교"
-        },
+        "테마 비교",
         Rect::new(s(26.), s(18.), s(320.), s(30.)),
         c.ui.text,
         17.,
@@ -84,11 +55,7 @@ pub fn paint(c: &mut Canvas, v: &Comparison, hover: Option<(i32, i32)>) -> Vec<H
         0,
     );
     c.text(
-        if v.presets {
-            "유명 테마(Catppuccin, Everforest, Rosé Pine, Monokai 등)의 코드 색상을 비교하고 선택하세요"
-        } else {
-            "같은 사진의 코드 색상을 비교하고 선택하세요 (우측 상단에서 유명 테마도 선택 가능)"
-        },
+        "정의된 6가지 컬러 스킴의 코드 색상을 비교하고 선택하세요",
         Rect::new(s(26.), s(56.), c.width - s(52.), s(24.)),
         c.ui.muted,
         12.,
@@ -96,20 +63,6 @@ pub fn paint(c: &mut Canvas, v: &Comparison, hover: Option<(i32, i32)>) -> Vec<H
         0,
     );
     for (label, right, width, selected, action) in [
-        (
-            "사진 추출",
-            456.,
-            92.,
-            !v.presets,
-            Action::Compare(Edit::Presets(false)),
-        ),
-        (
-            "유명 테마",
-            356.,
-            92.,
-            v.presets,
-            Action::Compare(Edit::Presets(true)),
-        ),
         (
             "다크",
             260.,
@@ -149,14 +102,8 @@ pub fn paint(c: &mut Canvas, v: &Comparison, hover: Option<(i32, i32)>) -> Vec<H
             height,
         );
         c.fill(r, c.ui.surface);
-        let (title_name, desc) = if v.presets {
-            (
-                crate::color_schemes::SCHEMES[i].name,
-                crate::color_schemes::SCHEMES[i].summary,
-            )
-        } else {
-            (crate::wallpaper_ui::NAMES[i], DESCRIPTIONS[i])
-        };
+        let scheme = &crate::color_schemes::SCHEMES[i];
+        let (title_name, desc) = (scheme.name, scheme.summary);
         c.text(
             &format!("{}  {}", i + 1, title_name),
             Rect::new(r.x + s(18.), r.y + s(9.), width - s(32.), s(24.)),

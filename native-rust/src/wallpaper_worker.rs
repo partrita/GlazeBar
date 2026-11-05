@@ -74,31 +74,14 @@ impl Worker {
         let revision = self.latest.fetch_add(1, Ordering::AcqRel) + 1;
         p.revision = revision;
         let mode =
-            crate::wallpaper_ui::ALL_MODES[p.mode.min(crate::wallpaper_ui::ALL_MODES.len() - 1)];
-        if p.enabled {
-            if let Some(preset) = crate::color_schemes::palette(mode, p.light) {
-                p.palette = Some(preset);
-                p.status.clear();
-            } else {
-                p.palette = None;
-            }
-        } else {
-            p.palette = None;
-        }
-        let image = if p.enabled {
-            p.files.get(p.selected).cloned().or_else(|| {
-                crate::color_schemes::find(mode)
-                    .is_some()
-                    .then(PathBuf::new)
-            })
+            crate::wallpaper_ui::SCHEME_IDS[p.mode.min(crate::wallpaper_ui::SCHEME_IDS.len() - 1)];
+        p.palette = if p.enabled {
+            crate::color_schemes::palette(mode, p.light)
         } else {
             None
         };
-        p.status = if image.is_some() && p.palette.is_none() {
-            "Aether 색상 추출 중…".into()
-        } else {
-            String::new()
-        };
+        p.status.clear();
+        let image = None;
         let mut files = p.neighbors();
         for path in &p.files {
             if !files.contains(path) {

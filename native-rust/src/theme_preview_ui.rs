@@ -91,7 +91,7 @@ pub fn paint(c: &mut Canvas, p: &Preview) {
 
     let Some(palette) = &p.palette else {
         c.text(
-            "색상 추출 중…",
+            "테마 색상이 설정되지 않았습니다",
             Rect::new(0, c.p(80.), c.width, c.height - c.p(80.)),
             c.ui.text,
             12.,

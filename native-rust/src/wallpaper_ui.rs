@@ -5,6 +5,8 @@ use std::{
     sync::Arc,
 };
 
+/// Legacy Aether extraction styles. Kept for the engine, cache, and CLI paths,
+/// but no longer exposed in the interactive theme picker.
 pub const MODES: [&str; 6] = [
     "normal",
     "muted",
@@ -13,7 +15,8 @@ pub const MODES: [&str; 6] = [
     "colorful",
     "high-contrast",
 ];
-pub const PRESET_MODES: [&str; 6] = [
+/// Canonical ids of the predefined color schemes used by every theme picker.
+pub const SCHEME_IDS: [&str; 6] = [
     "catppuccin",
     "everforest",
     "rose-pine",
@@ -21,43 +24,8 @@ pub const PRESET_MODES: [&str; 6] = [
     "dracula",
     "tokyo-night",
 ];
-pub const ALL_MODES: [&str; 12] = [
-    "normal",
-    "muted",
-    "pastel",
-    "material",
-    "colorful",
-    "high-contrast",
-    "catppuccin",
-    "everforest",
-    "rose-pine",
-    "monokai",
-    "dracula",
-    "tokyo-night",
-];
-pub const STYLES: [&str; 6] = [
-    "기본",
-    "차분하게",
-    "파스텔",
-    "머티리얼",
-    "선명하게",
-    "고대비",
-];
-pub const THEMES: [&str; 6] = [
-    "Catppuccin",
-    "Everforest",
-    "Rosé Pine",
-    "Monokai",
-    "Dracula",
-    "Tokyo Night",
-];
-pub const NAMES: [&str; 12] = [
-    "기본",
-    "차분하게",
-    "파스텔",
-    "머티리얼",
-    "선명하게",
-    "고대비",
+/// Display names matching `SCHEME_IDS` order.
+pub const SCHEME_NAMES: [&str; 6] = [
     "Catppuccin",
     "Everforest",
     "Rosé Pine",
@@ -67,7 +35,6 @@ pub const NAMES: [&str; 12] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Dropdown {
-    Style,
     Theme,
 }
 
@@ -84,6 +51,7 @@ pub enum Action {
     Target(usize),
     PreviewTab(crate::theme_preview_ui::PreviewTab),
     Windows,
+    #[allow(dead_code)] // Legacy Aether cache screen; no longer exposed in the UI.
     Precache,
     Compare,
     Restore,
@@ -197,9 +165,6 @@ impl Picker {
         if !self.busy && !self.files.is_empty() {
             self.selected = (self.selected as i64 + i64::from(delta))
                 .rem_euclid(self.files.len() as i64) as usize;
-            if self.mode < MODES.len() {
-                self.palette = None;
-            }
             self.status.clear();
         }
     }
@@ -381,68 +346,52 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         0,
     );
 
-    // 색상 함께 적용 토글
+    // 테마 색상 함께 적용 토글
     toggle(
         c,
         &mut hits,
-        "색상 적용",
-        Rect::new(s(122.), s(18.), s(95.), s(30.)),
+        "테마 색상 함께 적용",
+        Rect::new(s(122.), s(18.), s(156.), s(30.)),
         p.enabled,
         Action::Enabled,
         p.busy,
     );
 
-    // Style dropdown button
-    let style_name = if p.mode < MODES.len() {
-        STYLES[p.mode]
-    } else {
-        "스타일 선택"
-    };
-    let style_active = p.open_dropdown == Some(Dropdown::Style) || p.mode < MODES.len();
-    let style_rect = Rect::new(s(222.), s(18.), s(128.), s(30.));
-    button(
-        c,
-        &mut hits,
-        &format!("스타일: {style_name} ▾"),
-        style_rect,
-        style_active,
-        Action::ToggleDropdown(Dropdown::Style),
-        hover,
-        p.busy,
-    );
-
-    // Theme dropdown button
-    let theme_name = if p.mode >= MODES.len() {
-        THEMES[p.mode - MODES.len()]
-    } else {
-        "테마 선택"
-    };
-    let theme_active = p.open_dropdown == Some(Dropdown::Theme) || p.mode >= MODES.len();
-    let theme_rect = Rect::new(s(356.), s(18.), s(138.), s(30.));
+    // 정의된 컬러 스킴 선택 드롭다운
+    let theme_name = SCHEME_NAMES[p.mode.min(SCHEME_NAMES.len() - 1)];
+    let theme_rect = Rect::new(s(288.), s(18.), s(170.), s(30.));
     button(
         c,
         &mut hits,
         &format!("테마: {theme_name} ▾"),
         theme_rect,
-        theme_active,
+        p.open_dropdown == Some(Dropdown::Theme),
         Action::ToggleDropdown(Dropdown::Theme),
         hover,
         p.busy,
     );
 
-    // Dark / Light toggle buttons
-    for (label, x, light) in [("다크", 500., false), ("라이트", 562., true)] {
-        button(
-            c,
-            &mut hits,
-            label,
-            Rect::new(s(x), s(18.), s(58.), s(30.)),
-            p.light == light,
-            Action::Light(light),
-            hover,
-            p.busy,
-        );
-    }
+    // 다크 / 라이트 선택
+    button(
+        c,
+        &mut hits,
+        "다크",
+        Rect::new(s(472.), s(18.), s(58.), s(30.)),
+        !p.light,
+        Action::Light(false),
+        hover,
+        p.busy,
+    );
+    button(
+        c,
+        &mut hits,
+        "라이트",
+        Rect::new(s(534.), s(18.), s(58.), s(30.)),
+        p.light,
+        Action::Light(true),
+        hover,
+        p.busy,
+    );
 
     // Top-right action buttons: 온라인 찾기, 폴더 선택, 닫기
     button(
@@ -571,7 +520,7 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
     let palette_y = y + mh + s(34.);
     if !p.enabled {
         c.text(
-            "배경화면만 적용 (색상 추출 비활성화)",
+            "배경화면만 변경 (테마 색상 미적용)",
             Rect::new(s(24.), palette_y, w - s(48.), s(18.)),
             c.ui.muted,
             12.,
@@ -646,11 +595,10 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         p.busy,
     );
 
-    // Other utility buttons & prominent Apply button
+    // Utility buttons & prominent Apply button
     for (label, right, width, action) in [
-        ("전체 캐시 생성", 456., 112., Action::Precache),
-        ("스타일 비교", 340., 100., Action::Compare),
-        ("색상 복원", 236., 96., Action::Restore),
+        ("테마 비교", 340., 100., Action::Compare),
+        ("테마 복원", 236., 96., Action::Restore),
     ] {
         button(
             c,
@@ -712,66 +660,38 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         1,
     );
 
-    // If dropdown is open, render overlay popup menu on top and capture hits first
+    // 정의된 컬러 스킴 메뉴: 항목 히트가 전체 화면 닫기 히트보다 앞선다.
     if let Some(dropdown) = p.open_dropdown {
-        let (anchor_rect, items, offset) = match dropdown {
-            Dropdown::Style => (style_rect, &STYLES[..], 0usize),
-            Dropdown::Theme => (theme_rect, &THEMES[..], MODES.len()),
-        };
-        let menu_w = anchor_rect.w.max(s(140.));
-        let item_h = s(28.);
-        let menu_h = item_h * items.len() as i32 + s(8.);
-        let menu_x = anchor_rect.x;
-        let menu_y = anchor_rect.y + anchor_rect.h + s(4.);
-        let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-        // Outside click catcher hit to close dropdown
-        let mut dropdown_hits = vec![Hit {
-            rect: Rect::new(0, 0, w, h),
-            action: Action::CloseDropdown,
-        }];
-
-        // Draw shadow/frame and background
-        c.fill(menu_rect, c.ui.surface);
-        c.frame(menu_rect, c.ui.border);
-
-        for (idx, &item_label) in items.iter().enumerate() {
-            let item_rect = Rect::new(
-                menu_x + s(4.),
-                menu_y + s(4.) + idx as i32 * item_h,
-                menu_w - s(8.),
-                item_h,
-            );
-            let is_selected = p.mode == offset + idx;
-            let is_hover = hover.is_some_and(|(x, y)| item_rect.contains(x, y));
-            if is_selected {
-                c.fill(item_rect, c.ui.selected);
-            } else if is_hover {
-                c.fill(item_rect, c.ui.hover);
+        match dropdown {
+            Dropdown::Theme => {
+                let options: Vec<crate::views::DropdownOption> = SCHEME_IDS
+                    .iter()
+                    .enumerate()
+                    .map(|(index, id)| {
+                        let mut option =
+                            crate::views::DropdownOption::new(SCHEME_NAMES[index], p.mode == index);
+                        if let Some(palette) = crate::color_schemes::palette(id, p.light) {
+                            option = option.swatch(crate::graphics::parse(&palette[4]));
+                        }
+                        option
+                    })
+                    .collect();
+                let (items, dismiss) = crate::views::dropdown(c, theme_rect, &options, hover);
+                let mut dropdown_hits: Vec<Hit> = items
+                    .into_iter()
+                    .map(|(rect, index)| Hit {
+                        rect,
+                        action: Action::SetMode(index),
+                    })
+                    .collect();
+                dropdown_hits.push(Hit {
+                    rect: dismiss,
+                    action: Action::CloseDropdown,
+                });
+                dropdown_hits.append(&mut hits);
+                hits = dropdown_hits;
             }
-            let text_color = if is_selected { c.ui.accent } else { c.ui.text };
-            c.text(
-                item_label,
-                Rect::new(
-                    item_rect.x + s(10.),
-                    item_rect.y,
-                    item_rect.w - s(20.),
-                    item_rect.h,
-                ),
-                text_color,
-                12.,
-                is_selected,
-                0,
-            );
-            dropdown_hits.push(Hit {
-                rect: item_rect,
-                action: Action::SetMode(offset + idx),
-            });
         }
-
-        // Prepend dropdown hits so they take precedence over underlying controls
-        dropdown_hits.append(&mut hits);
-        hits = dropdown_hits;
     }
 
     c.frame(Rect::new(0, 0, w, h), c.ui.border);

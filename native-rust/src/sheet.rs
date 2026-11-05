@@ -11,7 +11,7 @@ const QUICK_START: [(&str, &str); 6] = [
     ("Win + Enter", "기본 터미널 열기"),
     ("Alt + 1 ~ 9", "작업공간 전환 (Shift: 창 이동)"),
     ("Alt + 방향키", "창 포커스 이동 (Win+방향키: 타일 이동)"),
-    ("Win+Ctrl+Alt+Space", "배경화면 · 유명 테마 변경"),
+    ("Win+Ctrl+Alt+Space", "배경화면 · 테마 변경"),
     ("Alt + F / Alt + W", "전체 화면 전환 / 현재 창 닫기"),
     ("Win + F1", "단축키 안내 언제든 다시 열기"),
 ];

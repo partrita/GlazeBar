@@ -344,10 +344,12 @@ impl BarSettings {
                     let item = order.remove(*idx);
                     order.insert(new_idx, item);
                     self.widget_order = order;
+                    self.open_dropdown = None;
                 }
             }
             Edit::ResetWidgetOrder => {
                 self.widget_order = default_widget_order();
+                self.open_dropdown = None;
             }
             Edit::ToggleDropdown(d) => {
                 self.open_dropdown = if self.open_dropdown == Some(*d) {
@@ -443,7 +445,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         0,
     );
     c.text(
-        "상단 바 표시 위젯 및 위치 순서, 날씨 지역, 기본 실행 프로그램, 테마 연동 앱을 설정합니다",
+        "상단 바 위젯, 날씨 지역, 기본 실행 프로그램, 테마 적용 대상을 설정합니다",
         Rect::new(s(26.), s(46.), w - s(140.), s(22.)),
         c.ui.muted,
         11.5,
@@ -467,7 +469,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     let sec1 = Rect::new(s(24.), s(76.), w - s(48.), s(195.));
     c.round_rect(sec1, c.ui.surface, s(8.));
     c.text(
-        "상단 바 위젯 표시 설정 및 위치 순서 변경 (드롭다운)",
+        "상단 바 위젯",
         Rect::new(s(38.), s(84.), s(380.), s(22.)),
         c.ui.accent,
         12.,
@@ -490,7 +492,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     views::button(
         c,
         &mut hits,
-        &format!("날씨: {city_name} ▾"),
+        &format!("날씨 지역: {city_name} ▾"),
         city_btn,
         v.open_dropdown == Some(SettingsDropdown::City),
         hover.is_some_and(|(x, y)| city_btn.contains(x, y)),
@@ -502,7 +504,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     views::button(
         c,
         &mut hits,
-        &format!("시계: {clock_name} ▾"),
+        &format!("시계 표시: {clock_name} ▾"),
         clock_btn,
         v.open_dropdown == Some(SettingsDropdown::ClockFormat),
         hover.is_some_and(|(x, y)| clock_btn.contains(x, y)),
@@ -558,7 +560,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
             &mut hits,
             &full_label,
             item_r,
-            is_open || is_visible,
+            is_open,
             item_hover,
             true,
             Action::Settings(Edit::ToggleDropdown(SettingsDropdown::WidgetVisibility(i))),
@@ -586,7 +588,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     let sec2 = Rect::new(s(24.), s(280.), w - s(48.), s(116.));
     c.round_rect(sec2, c.ui.surface, s(8.));
     c.text(
-        "창 관리 및 기본 실행 프로그램 (드롭다운)",
+        "창 관리 및 기본 실행 프로그램",
         Rect::new(s(38.), s(288.), s(360.), s(22.)),
         c.ui.accent,
         12.,
@@ -696,7 +698,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     // Bottom quick actions
     for (label, x, width, selected, edit) in [
         (
-            "테마 · 배경화면 열기",
+            "배경화면 · 테마 열기",
             24.,
             160.,
             false,
@@ -734,273 +736,101 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         1,
     );
 
-    // Render Dropdown Menus if active (Overlay with precedence)
+    // Shared dropdown overlay: item hits precede the full-window dismiss hit.
     if let Some(dropdown) = v.open_dropdown {
-        let mut dropdown_hits = vec![Hit {
-            rect: Rect::new(0, 0, w, h),
-            action: Action::Settings(Edit::CloseDropdown),
-        }];
-
-        match dropdown {
-            SettingsDropdown::WidgetVisibility(idx) => {
-                if let Some(&(anchor, _, ref wid, is_vis)) =
-                    widget_dropdown_rects.iter().find(|(_, i, _, _)| *i == idx)
-                {
-                    let menu_w = anchor.w.max(s(160.));
-                    let item_h = s(26.);
-                    let items_count = 4; // [표시함, 숨김, 위로 이동, 아래로 이동]
-                    let menu_h = item_h * items_count + s(8.);
-                    let menu_x = anchor.x;
-                    let menu_y = anchor.y + anchor.h + s(2.);
-                    let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                    c.fill(menu_rect, c.ui.surface);
-                    c.frame(menu_rect, c.ui.border);
-
-                    let options: [(&str, Edit, bool); 4] = [
-                        (
-                            "✓ 상단 바에 표시함",
+        let (anchor, options, actions): (Rect, Vec<views::DropdownOption>, Vec<Edit>) =
+            match dropdown {
+                SettingsDropdown::WidgetVisibility(idx) => {
+                    let (anchor, _, wid, is_vis) = widget_dropdown_rects
+                        .iter()
+                        .find(|(_, i, _, _)| *i == idx)
+                        .cloned()
+                        .unwrap_or((Rect::new(0, 0, 0, 0), idx, String::new(), false));
+                    (
+                        anchor,
+                        vec![
+                            views::DropdownOption::new("표시함", is_vis),
+                            views::DropdownOption::new("숨김", !is_vis),
+                            views::DropdownOption::new("왼쪽으로 이동", false),
+                            views::DropdownOption::new("오른쪽으로 이동", false),
+                        ],
+                        vec![
                             Edit::SetWidgetVisible(wid.clone(), true),
-                            is_vis,
-                        ),
-                        (
-                            "✕ 상단 바에서 숨김",
-                            Edit::SetWidgetVisible(wid.clone(), false),
-                            !is_vis,
-                        ),
-                        ("▲ 왼쪽(앞)으로 위치 이동", Edit::MoveWidget(idx, -1), false),
-                        (
-                            "▼ 오른쪽(뒤)으로 위치 이동",
+                            Edit::SetWidgetVisible(wid, false),
+                            Edit::MoveWidget(idx, -1),
                             Edit::MoveWidget(idx, 1),
-                            false,
-                        ),
-                    ];
-
-                    for (opt_idx, (text, action, selected)) in options.into_iter().enumerate() {
-                        let item_r = Rect::new(
-                            menu_x + s(4.),
-                            menu_y + s(4.) + opt_idx as i32 * item_h,
-                            menu_w - s(8.),
-                            item_h,
-                        );
-                        let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                        if selected {
-                            c.fill(item_r, c.ui.selected);
-                        } else if is_h {
-                            c.fill(item_r, c.ui.hover);
-                        }
-                        c.text(
-                            text,
-                            Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                            if selected { c.ui.accent } else { c.ui.text },
-                            11.5,
-                            selected,
-                            0,
-                        );
-                        dropdown_hits.push(Hit {
-                            rect: item_r,
-                            action: Action::Settings(action),
-                        });
-                    }
+                        ],
+                    )
                 }
-            }
-            SettingsDropdown::City => {
-                let menu_w = s(160.);
-                let item_h = s(24.);
-                let menu_h = item_h * CITIES.len() as i32 + s(8.);
-                let menu_x = city_btn.x;
-                let menu_y = city_btn.y + city_btn.h + s(2.);
-                let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                c.fill(menu_rect, c.ui.surface);
-                c.frame(menu_rect, c.ui.border);
-
-                for (idx, city) in CITIES.iter().enumerate() {
-                    let item_r = Rect::new(
-                        menu_x + s(4.),
-                        menu_y + s(4.) + idx as i32 * item_h,
-                        menu_w - s(8.),
-                        item_h,
-                    );
-                    let is_sel = v.weather_city == idx;
-                    let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                    if is_sel {
-                        c.fill(item_r, c.ui.selected);
-                    } else if is_h {
-                        c.fill(item_r, c.ui.hover);
-                    }
-                    c.text(
-                        city.name,
-                        Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                        if is_sel { c.ui.accent } else { c.ui.text },
-                        11.5,
-                        is_sel,
-                        0,
-                    );
-                    dropdown_hits.push(Hit {
-                        rect: item_r,
-                        action: Action::Settings(Edit::SetCity(idx)),
-                    });
-                }
-            }
-            SettingsDropdown::ClockFormat => {
-                let menu_w = s(170.);
-                let item_h = s(24.);
-                let menu_h = item_h * CLOCK_FORMATS.len() as i32 + s(8.);
-                let menu_x = clock_btn.x;
-                let menu_y = clock_btn.y + clock_btn.h + s(2.);
-                let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                c.fill(menu_rect, c.ui.surface);
-                c.frame(menu_rect, c.ui.border);
-
-                for (idx, (label, desc)) in CLOCK_FORMATS.iter().enumerate() {
-                    let item_r = Rect::new(
-                        menu_x + s(4.),
-                        menu_y + s(4.) + idx as i32 * item_h,
-                        menu_w - s(8.),
-                        item_h,
-                    );
-                    let is_sel = v.clock_format_idx == idx;
-                    let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                    if is_sel {
-                        c.fill(item_r, c.ui.selected);
-                    } else if is_h {
-                        c.fill(item_r, c.ui.hover);
-                    }
-                    c.text(
-                        &format!("{label} ({desc})"),
-                        Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                        if is_sel { c.ui.accent } else { c.ui.text },
-                        11.,
-                        is_sel,
-                        0,
-                    );
-                    dropdown_hits.push(Hit {
-                        rect: item_r,
-                        action: Action::Settings(Edit::SetClockFormat(idx)),
-                    });
-                }
-            }
-            SettingsDropdown::Opacity => {
-                let menu_w = s(150.);
-                let item_h = s(24.);
-                let menu_h = item_h * OPACITY_STEPS.len() as i32 + s(8.);
-                let menu_x = opacity_btn.x;
-                let menu_y = opacity_btn.y + opacity_btn.h + s(2.);
-                let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                c.fill(menu_rect, c.ui.surface);
-                c.frame(menu_rect, c.ui.border);
-
-                for (idx, (label, _)) in OPACITY_STEPS.iter().enumerate() {
-                    let item_r = Rect::new(
-                        menu_x + s(4.),
-                        menu_y + s(4.) + idx as i32 * item_h,
-                        menu_w - s(8.),
-                        item_h,
-                    );
-                    let is_sel = v.opacity_idx == idx;
-                    let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                    if is_sel {
-                        c.fill(item_r, c.ui.selected);
-                    } else if is_h {
-                        c.fill(item_r, c.ui.hover);
-                    }
-                    c.text(
-                        label,
-                        Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                        if is_sel { c.ui.accent } else { c.ui.text },
-                        11.5,
-                        is_sel,
-                        0,
-                    );
-                    dropdown_hits.push(Hit {
-                        rect: item_r,
-                        action: Action::Settings(Edit::SetOpacity(idx)),
-                    });
-                }
-            }
-            SettingsDropdown::Terminal => {
-                let menu_w = r_term.w;
-                let item_h = s(26.);
-                let menu_h = item_h * TERMINALS.len() as i32 + s(8.);
-                let menu_x = r_term.x;
-                let menu_y = r_term.y + r_term.h + s(2.);
-                let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                c.fill(menu_rect, c.ui.surface);
-                c.frame(menu_rect, c.ui.border);
-
-                for (idx, (label, _)) in TERMINALS.iter().enumerate() {
-                    let item_r = Rect::new(
-                        menu_x + s(4.),
-                        menu_y + s(4.) + idx as i32 * item_h,
-                        menu_w - s(8.),
-                        item_h,
-                    );
-                    let is_sel = v.terminal_idx == idx;
-                    let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                    if is_sel {
-                        c.fill(item_r, c.ui.selected);
-                    } else if is_h {
-                        c.fill(item_r, c.ui.hover);
-                    }
-                    c.text(
-                        label,
-                        Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                        if is_sel { c.ui.accent } else { c.ui.text },
-                        11.5,
-                        is_sel,
-                        0,
-                    );
-                    dropdown_hits.push(Hit {
-                        rect: item_r,
-                        action: Action::Settings(Edit::SetTerminal(idx)),
-                    });
-                }
-            }
-            SettingsDropdown::Browser => {
-                let menu_w = r_brow.w;
-                let item_h = s(26.);
-                let menu_h = item_h * BROWSERS.len() as i32 + s(8.);
-                let menu_x = r_brow.x;
-                let menu_y = r_brow.y + r_brow.h + s(2.);
-                let menu_rect = Rect::new(menu_x, menu_y, menu_w, menu_h);
-
-                c.fill(menu_rect, c.ui.surface);
-                c.frame(menu_rect, c.ui.border);
-
-                for (idx, (label, _)) in BROWSERS.iter().enumerate() {
-                    let item_r = Rect::new(
-                        menu_x + s(4.),
-                        menu_y + s(4.) + idx as i32 * item_h,
-                        menu_w - s(8.),
-                        item_h,
-                    );
-                    let is_sel = v.browser_idx == idx;
-                    let is_h = hover.is_some_and(|(x, y)| item_r.contains(x, y));
-                    if is_sel {
-                        c.fill(item_r, c.ui.selected);
-                    } else if is_h {
-                        c.fill(item_r, c.ui.hover);
-                    }
-                    c.text(
-                        label,
-                        Rect::new(item_r.x + s(8.), item_r.y, item_r.w - s(16.), item_r.h),
-                        if is_sel { c.ui.accent } else { c.ui.text },
-                        11.5,
-                        is_sel,
-                        0,
-                    );
-                    dropdown_hits.push(Hit {
-                        rect: item_r,
-                        action: Action::Settings(Edit::SetBrowser(idx)),
-                    });
-                }
-            }
-        }
-
+                SettingsDropdown::City => (
+                    city_btn,
+                    CITIES
+                        .iter()
+                        .enumerate()
+                        .map(|(i, city)| views::DropdownOption::new(city.name, v.weather_city == i))
+                        .collect(),
+                    (0..CITIES.len()).map(Edit::SetCity).collect(),
+                ),
+                SettingsDropdown::ClockFormat => (
+                    clock_btn,
+                    CLOCK_FORMATS
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (label, desc))| {
+                            views::DropdownOption::new(
+                                format!("{label} · {desc}"),
+                                v.clock_format_idx == i,
+                            )
+                        })
+                        .collect(),
+                    (0..CLOCK_FORMATS.len()).map(Edit::SetClockFormat).collect(),
+                ),
+                SettingsDropdown::Opacity => (
+                    opacity_btn,
+                    OPACITY_STEPS
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (label, _))| {
+                            views::DropdownOption::new(*label, v.opacity_idx == i)
+                        })
+                        .collect(),
+                    (0..OPACITY_STEPS.len()).map(Edit::SetOpacity).collect(),
+                ),
+                SettingsDropdown::Terminal => (
+                    r_term,
+                    TERMINALS
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (label, _))| {
+                            views::DropdownOption::new(*label, v.terminal_idx == i)
+                        })
+                        .collect(),
+                    (0..TERMINALS.len()).map(Edit::SetTerminal).collect(),
+                ),
+                SettingsDropdown::Browser => (
+                    r_brow,
+                    BROWSERS
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (label, _))| {
+                            views::DropdownOption::new(*label, v.browser_idx == i)
+                        })
+                        .collect(),
+                    (0..BROWSERS.len()).map(Edit::SetBrowser).collect(),
+                ),
+            };
+        let (items, dismiss) = views::dropdown(c, anchor, &options, hover);
+        let mut dropdown_hits: Vec<Hit> = items
+            .into_iter()
+            .map(|(rect, index)| Hit {
+                rect,
+                action: Action::Settings(actions[index].clone()),
+            })
+            .collect();
+        dropdown_hits.push(Hit {
+            rect: dismiss,
+            action: Action::Settings(Edit::CloseDropdown),
+        });
         dropdown_hits.append(&mut hits);
         hits = dropdown_hits;
     }
@@ -1012,6 +842,40 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn open_dropdown_item_wins_over_dismiss_target() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap();
+        let output = tempfile::tempdir().unwrap();
+        let settings = BarSettings {
+            open_dropdown: Some(SettingsDropdown::Opacity),
+            ..Default::default()
+        };
+        let mut hits = Vec::new();
+        crate::graphics::render_png(
+            root,
+            &output.path().join("settings.png"),
+            800,
+            600,
+            1.,
+            crate::graphics::Palette::load(root),
+            |canvas| {
+                hits = paint(canvas, &settings, None);
+            },
+        )
+        .unwrap();
+        let first = hits
+            .iter()
+            .find(|hit| hit.rect.contains(340, 126))
+            .expect("opacity menu item hit");
+        assert_eq!(
+            first.action,
+            Action::Settings(Edit::SetOpacity(0)),
+            "the dropdown item must take precedence over the dismiss target"
+        );
+    }
 
     #[test]
     fn settings_roundtrip_and_config_update() {
