@@ -29,6 +29,8 @@ pub enum Action {
     Compare(crate::style_compare_ui::Edit),
     WindowsOption(crate::windows_options_ui::Edit),
     Picker(crate::wallpaper_ui::Action),
+    HubTab(crate::hub::Tab),
+    HubRetryTheme,
     QuickTheme,
     QuickThemeSelect(String),
     QuickThemeLight(bool),

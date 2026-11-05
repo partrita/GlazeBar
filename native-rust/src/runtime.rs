@@ -654,44 +654,59 @@ pub fn run_with_popup(
                     }
                 }
                 Update::Control(name) => match name.as_str() {
-                    "Wallpaper" => {
-                        wallpaper_worker.cancel();
-                        if popup
-                            .as_ref()
-                            .is_some_and(|w| matches!(w.state.borrow().scene, Scene::Wallpaper(_)))
-                        {
-                            popup = None;
+                    "Wallpaper" | "Settings" => {
+                        let tab = if name == "Wallpaper" {
+                            crate::hub::Tab::Theme
                         } else {
-                            match crate::wallpaper_ui::Picker::load(&root) {
-                                Ok(p) => {
-                                    let (bounds, scale) =
-                                        crate::native::centered_bounds(1000., 590.);
-                                    match Window::new(
-                                        "GlazeBar · 배경화면",
-                                        bounds,
-                                        make_state(&root, scale, Scene::Wallpaper(p), false, &ntx),
-                                        null_mut(),
-                                    ) {
-                                        Ok(w) => {
-                                            if let Scene::Wallpaper(p) =
-                                                &mut w.state.borrow_mut().scene
-                                            {
-                                                wallpaper_worker.request(w.hwnd as usize, p);
-                                            }
-                                            w.show();
-                                            popup = Some(w);
-                                        }
-                                        Err(e) => {
-                                            result = Err(e);
-                                            break 'main;
+                            crate::hub::Tab::Settings
+                        };
+                        wallpaper_worker.cancel();
+                        child_popup = None;
+                        let existing = popup
+                            .as_ref()
+                            .filter(|w| matches!(w.state.borrow().scene, Scene::Hub(_)));
+                        if let Some(w) = existing {
+                            let same_tab =
+                                matches!(&w.state.borrow().scene, Scene::Hub(h) if h.tab == tab);
+                            if same_tab {
+                                popup = None;
+                            } else {
+                                if let Scene::Hub(h) = &mut w.state.borrow_mut().scene {
+                                    h.switch(tab);
+                                    if tab == crate::hub::Tab::Theme {
+                                        if let Some(p) = h.picker_mut() {
+                                            wallpaper_worker.request(w.hwnd as usize, p);
                                         }
                                     }
                                 }
+                                w.invalidate();
+                            }
+                        } else {
+                            let hub = crate::hub::Hub::new(&root, tab);
+                            let (bounds, scale) = crate::native::centered_bounds(
+                                crate::hub::WINDOW_SIZE.0,
+                                crate::hub::WINDOW_SIZE.1,
+                            );
+                            match Window::new(
+                                "GlazeBar · 설정",
+                                bounds,
+                                make_state(&root, scale, Scene::Hub(hub), false, &ntx),
+                                null_mut(),
+                            ) {
+                                Ok(w) => {
+                                    if tab == crate::hub::Tab::Theme {
+                                        if let Scene::Hub(h) = &mut w.state.borrow_mut().scene {
+                                            if let Some(p) = h.picker_mut() {
+                                                wallpaper_worker.request(w.hwnd as usize, p);
+                                            }
+                                        }
+                                    }
+                                    w.show();
+                                    popup = Some(w);
+                                }
                                 Err(e) => {
-                                    let _ = std::fs::write(
-                                        root.join("rust-runtime-error.log"),
-                                        e.to_string(),
-                                    );
+                                    result = Err(e);
+                                    break 'main;
                                 }
                             }
                         }
@@ -758,34 +773,6 @@ pub fn run_with_popup(
                                     true,
                                     &ntx,
                                 ),
-                                null_mut(),
-                            ) {
-                                Ok(w) => {
-                                    w.show();
-                                    popup = Some(w);
-                                }
-                                Err(e) => {
-                                    result = Err(e);
-                                    break 'main;
-                                }
-                            }
-                        }
-                    }
-                    "Settings" => {
-                        wallpaper_worker.cancel();
-                        child_popup = None;
-                        if popup
-                            .as_ref()
-                            .is_some_and(|w| matches!(w.state.borrow().scene, Scene::Settings(_)))
-                        {
-                            popup = None;
-                        } else {
-                            let settings = crate::settings_ui::BarSettings::load(&root);
-                            let (bounds, scale) = crate::native::centered_bounds(860., 615.);
-                            match Window::new(
-                                "GlazeBar · 환경 설정",
-                                bounds,
-                                make_state(&root, scale, Scene::Settings(settings), false, &ntx),
                                 null_mut(),
                             ) {
                                 Ok(w) => {
@@ -877,7 +864,7 @@ pub fn run_with_popup(
                     if let Some(w) = &popup {
                         let mut state = w.state.borrow_mut();
                         state.palette = palette;
-                        if let Scene::Wallpaper(p) = &mut state.scene {
+                        if let Some(p) = state.scene.picker_mut() {
                             if w.hwnd as usize == hwnd && p.operation == operation {
                                 p.busy = false;
                                 p.status = match &outcome {
@@ -1019,7 +1006,7 @@ pub fn run_with_popup(
                     }
                     if let Some(path) = downloaded {
                         if let Some(owner) = &popup {
-                            if let Scene::Wallpaper(p) = &mut owner.state.borrow_mut().scene {
+                            if let Some(p) = owner.state.borrow_mut().scene.picker_mut() {
                                 match crate::wallpaper_ui::Picker::load(&root) {
                                     Ok(loaded) => {
                                         p.files = loaded.files;
@@ -1049,7 +1036,7 @@ pub fn run_with_popup(
                 }
                 Update::Wallpaper(hwnd, revision, item) => {
                     if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                        if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
+                        if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                             if p.revision == revision {
                                 match item {
                                     crate::wallpaper_worker::Item::Image(path, im) => {
@@ -1335,7 +1322,7 @@ pub fn run_with_popup(
                 NativeEvent::Action(hwnd, action) => match action {
                     Action::Picker(crate::wallpaper_ui::Action::Precache) => {
                         if let Some(owner) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            let files = if let Scene::Wallpaper(p) = &owner.state.borrow().scene {
+                            let files = if let Some(p) = owner.state.borrow().scene.picker() {
                                 if !p.busy && !p.files.is_empty() {
                                     Some(p.files.clone())
                                 } else {
@@ -1402,7 +1389,8 @@ pub fn run_with_popup(
                     }
                     Action::Picker(crate::wallpaper_ui::Action::Online) => {
                         if let Some(owner) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            let available = matches!(&owner.state.borrow().scene,Scene::Wallpaper(p) if !p.busy);
+                            let available =
+                                owner.state.borrow().scene.picker().is_some_and(|p| !p.busy);
                             if available {
                                 child_popup = None;
                                 let (bounds, scale) = crate::native::centered_bounds(1000., 650.);
@@ -1643,22 +1631,21 @@ pub fn run_with_popup(
                     }
                     Action::Picker(crate::wallpaper_ui::Action::Compare) => {
                         if let Some(owner) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            let comparison =
-                                if let Scene::Wallpaper(p) = &owner.state.borrow().scene {
-                                    if p.busy {
-                                        None
-                                    } else {
-                                        p.files.get(p.selected).map(|image| {
-                                            crate::style_compare_ui::Comparison::new(
-                                                image.clone(),
-                                                p.mode,
-                                                p.light,
-                                            )
-                                        })
-                                    }
-                                } else {
+                            let comparison = if let Some(p) = owner.state.borrow().scene.picker() {
+                                if p.busy {
                                     None
-                                };
+                                } else {
+                                    p.files.get(p.selected).map(|image| {
+                                        crate::style_compare_ui::Comparison::new(
+                                            image.clone(),
+                                            p.mode,
+                                            p.light,
+                                        )
+                                    })
+                                }
+                            } else {
+                                None
+                            };
                             if let Some(comparison) = comparison {
                                 child_popup = None;
                                 let (bounds, scale) = crate::native::centered_bounds(1120., 680.);
@@ -1714,7 +1701,7 @@ pub fn run_with_popup(
                         }
                         if let Some((index, light)) = choice {
                             if let Some(owner) = &popup {
-                                if let Scene::Wallpaper(p) = &mut owner.state.borrow_mut().scene {
+                                if let Some(p) = owner.state.borrow_mut().scene.picker_mut() {
                                     p.mode = index;
                                     p.light = light;
                                     wallpaper_worker.request(owner.hwnd as usize, p);
@@ -1729,7 +1716,7 @@ pub fn run_with_popup(
                     }
                     Action::Picker(crate::wallpaper_ui::Action::Windows) => {
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            let settings = if let Scene::Wallpaper(p) = &w.state.borrow().scene {
+                            let settings = if let Some(p) = w.state.borrow().scene.picker() {
                                 if p.busy {
                                     None
                                 } else {
@@ -1789,7 +1776,7 @@ pub fn run_with_popup(
                         }
                         if let Some(selected) = selected {
                             if let Some(w) = &popup {
-                                if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
+                                if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                                     p.windows = selected.enabled;
                                     p.options = selected.options;
                                 }
@@ -1799,6 +1786,33 @@ pub fn run_with_popup(
                             if let Some(w) = &popup {
                                 w.show();
                             }
+                        }
+                    }
+                    Action::HubTab(tab) => {
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::Hub(h) = &mut w.state.borrow_mut().scene {
+                                h.switch(tab);
+                                if tab == crate::hub::Tab::Theme {
+                                    if h.picker.is_none() {
+                                        h.reload_theme(&root);
+                                    }
+                                    if let Some(p) = h.picker_mut() {
+                                        wallpaper_worker.request(hwnd, p);
+                                    }
+                                }
+                            }
+                            w.invalidate();
+                        }
+                    }
+                    Action::HubRetryTheme => {
+                        if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            if let Scene::Hub(h) = &mut w.state.borrow_mut().scene {
+                                h.reload_theme(&root);
+                                if let Some(p) = h.picker_mut() {
+                                    wallpaper_worker.request(hwnd, p);
+                                }
+                            }
+                            w.invalidate();
                         }
                     }
                     Action::Wallpaper => send(&tx, thread, Update::Control("Wallpaper".into())),
@@ -1923,8 +1937,7 @@ pub fn run_with_popup(
                     }
                     Action::Picker(crate::wallpaper_ui::Action::Folder) => {
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            let allowed =
-                                matches!(&w.state.borrow().scene,Scene::Wallpaper(p) if !p.busy);
+                            let allowed = w.state.borrow().scene.picker().is_some_and(|p| !p.busy);
                             if allowed {
                                 // No RefCell borrow may span a native modal dialog's message pump.
                                 let selection = crate::wallpaper::choose_folder(w.hwnd);
@@ -1942,7 +1955,7 @@ pub fn run_with_popup(
                                         Ok(None)
                                     }
                                 });
-                                if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
+                                if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                                     match result {
                                         Ok(Some(next)) => {
                                             p.files = next.files;
@@ -1965,7 +1978,7 @@ pub fn run_with_popup(
                         | crate::wallpaper_ui::Action::Restore),
                     ) => {
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
+                            if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                                 if !p.busy {
                                     if theme_job.is_some() {
                                         p.status = "다른 색상 적용 작업이 진행 중입니다".into();
@@ -2026,7 +2039,7 @@ pub fn run_with_popup(
                     Action::Picker(action) => {
                         let mut close_wallpaper = false;
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
-                            if let Scene::Wallpaper(p) = &mut w.state.borrow_mut().scene {
+                            if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                                 if !p.busy {
                                     use crate::wallpaper_ui::Action as P;
                                     let mut extract = true;
@@ -2062,13 +2075,6 @@ pub fn run_with_popup(
                                         P::Light(light) => {
                                             p.open_dropdown = None;
                                             p.light = light;
-                                        }
-                                        P::Target(i) => {
-                                            p.open_dropdown = None;
-                                            if let Some(v) = p.targets.get_mut(i) {
-                                                *v = !*v;
-                                            }
-                                            extract = false;
                                         }
                                         P::PreviewTab(tab) => {
                                             p.preview_tab = tab;
@@ -2108,7 +2114,7 @@ pub fn run_with_popup(
                         let is_popup = popup.as_ref().is_some_and(|w| w.hwnd as usize == hwnd);
                         if is_popup {
                             if let Some(w) = &popup {
-                                if let Scene::Settings(v) = &mut w.state.borrow_mut().scene {
+                                if let Some(v) = w.state.borrow_mut().scene.settings_mut() {
                                     use crate::settings_ui::Edit as E;
                                     match &edit {
                                         E::OpenConfig => {
@@ -2135,10 +2141,6 @@ pub fn run_with_popup(
                                             v.status =
                                                 "설정을 저장하고 GlazeWM에 다시 적용했습니다."
                                                     .into();
-                                        }
-                                        E::OpenWallpaper => {
-                                            let _ = v.save(&root);
-                                            next_control = Some("Wallpaper");
                                         }
                                         E::OpenSheet => {
                                             let _ = v.save(&root);
@@ -2632,13 +2634,13 @@ pub fn run_with_popup(
                 SetTimer(null_mut(), timer, 60000, None);
             }
         }
-        let preview_owner = popup
-            .as_ref()
-            .filter(|w| matches!(w.state.borrow().scene, Scene::Wallpaper(_)));
+        let preview_owner = popup.as_ref().filter(|w| {
+            matches!(&w.state.borrow().scene, Scene::Hub(h) if h.is_theme_tab() && h.picker.is_some())
+        });
         if let Some(owner) = preview_owner {
             let (enabled, preview, scale, palette) = {
                 let s = owner.state.borrow();
-                let Scene::Wallpaper(p) = &s.scene else {
+                let Some(p) = s.scene.picker() else {
                     unreachable!()
                 };
                 (
@@ -2739,7 +2741,7 @@ pub fn run_with_popup(
             if let Some(w) = &popup {
                 let ready = {
                     let state = w.state.borrow();
-                    if let Scene::Wallpaper(p) = &state.scene {
+                    if let Some(p) = state.scene.picker() {
                         let _=std::fs::write(root.join("rust-shadow-wallpaper.json"),serde_json::to_vec_pretty(&serde_json::json!({"pid":std::process::id(),"files":p.files.len(),"selected":p.selected,"loaded":p.loaded.len(),"paletteReady":p.palette.is_some(),"status":p.status,"hits":state.hits.len(),"mode":crate::wallpaper_ui::SCHEME_IDS[p.mode.min(crate::wallpaper_ui::SCHEME_IDS.len()-1)],"light":p.light})).unwrap());
                         p.palette.is_some()
                             && p.neighbors().iter().all(|path| p.loaded.contains(path))
@@ -2848,6 +2850,7 @@ pub fn signal(root: &std::path::Path, argument: &str) -> Result<()> {
         "--bar" => "Bar",
         "--sheet" => "Sheet",
         "--wallpaper" => "Wallpaper",
+        "--settings" => "Settings",
         "--resync" => "FocusResync",
         "--snapshot" => "Snapshot",
         "--close-popups" => "ClosePopups",

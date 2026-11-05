@@ -224,7 +224,6 @@ pub enum Edit {
     SelectAllTargets(bool),
     OpenConfig,
     ReloadGlazeWM,
-    OpenWallpaper,
     OpenSheet,
     Save,
 }
@@ -429,7 +428,9 @@ fn toggle(c: &mut Canvas, hits: &mut Vec<Hit>, label: &str, r: Rect, checked: bo
     });
 }
 
-pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<Hit> {
+/// `chrome` is false when the screen is embedded in the settings hub, which
+/// draws its own close button in the shared tab strip.
+pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome: bool) -> Vec<Hit> {
     let mut hits = vec![];
     let scale = c.scale;
     let s = |n: f64| (n * scale).round_ties_even() as i32;
@@ -437,7 +438,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
     let h = c.height;
 
     c.text(
-        "GlazeBar 환경 설정",
+        "상단 바 · 시스템",
         Rect::new(s(26.), s(16.), s(320.), s(30.)),
         c.ui.text,
         18.,
@@ -453,17 +454,19 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         0,
     );
 
-    let close_rect = Rect::new(w - s(98.), s(18.), s(72.), s(30.));
-    views::button(
-        c,
-        &mut hits,
-        "닫기",
-        close_rect,
-        false,
-        hover.is_some_and(|(x, y)| close_rect.contains(x, y)),
-        true,
-        Action::Close,
-    );
+    if chrome {
+        let close_rect = Rect::new(w - s(98.), s(18.), s(72.), s(30.));
+        views::button(
+            c,
+            &mut hits,
+            "닫기",
+            close_rect,
+            false,
+            hover.is_some_and(|(x, y)| close_rect.contains(x, y)),
+            true,
+            Action::Close,
+        );
+    }
 
     // Section 1: 상단 바 위젯 및 디스플레이 드롭다운 설정
     let sec1 = Rect::new(s(24.), s(76.), w - s(48.), s(195.));
@@ -695,19 +698,12 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>) -> Vec<
         );
     }
 
-    // Bottom quick actions
+    // Bottom quick actions. Theme switching lives in the shared tab strip.
     for (label, x, width, selected, edit) in [
-        (
-            "배경화면 · 테마 열기",
-            24.,
-            160.,
-            false,
-            Edit::OpenWallpaper,
-        ),
-        ("단축키 안내 보기", 194., 145., false, Edit::OpenSheet),
-        ("config.yaml 직접 편집", 349., 165., false, Edit::OpenConfig),
-        ("GlazeWM 재적용", 524., 135., false, Edit::ReloadGlazeWM),
-        ("저장 완료", 686., 150., true, Edit::Save),
+        ("단축키 안내 보기", 24., 145., false, Edit::OpenSheet),
+        ("config.yaml 직접 편집", 177., 165., false, Edit::OpenConfig),
+        ("GlazeWM 재적용", 350., 135., false, Edit::ReloadGlazeWM),
+        ("저장 완료", 493., 150., true, Edit::Save),
     ] {
         let r = Rect::new(s(x), s(542.), s(width), s(34.));
         views::button(
@@ -862,7 +858,7 @@ mod tests {
             1.,
             crate::graphics::Palette::load(root),
             |canvas| {
-                hits = paint(canvas, &settings, None);
+                hits = paint(canvas, &settings, None, true);
             },
         )
         .unwrap();

@@ -293,7 +293,7 @@ pub fn render(root: &Path) -> anyhow::Result<()> {
             }
             let mut picker_hits = vec![];
             save("wallpaper", 1000., 590., &mut |c| {
-                picker_hits=crate::wallpaper_ui::paint(c, &picker, None).into_iter().map(|h| serde_json::json!({"bounds":{"L":h.rect.x,"T":h.rect.y,"R":h.rect.x+h.rect.w,"B":h.rect.y+h.rect.h},"cursor":"Hand"})).collect::<Vec<_>>();
+                picker_hits=crate::wallpaper_ui::paint(c, &picker, None, true).into_iter().map(|h| serde_json::json!({"bounds":{"L":h.rect.x,"T":h.rect.y,"R":h.rect.x+h.rect.w,"B":h.rect.y+h.rect.h},"cursor":"Hand"})).collect::<Vec<_>>();
             })?;
             let controls: Vec<serde_json::Value> = serde_json::from_slice(&std::fs::read(
                 root.join("ui-reference/go/controls.json"),

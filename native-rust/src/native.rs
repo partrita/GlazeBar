@@ -41,14 +41,33 @@ pub enum Scene {
     Power(crate::power::Profiles),
     Wifi(crate::wifi_ui::Wifi),
     Sheet(crate::sheet::Sheet),
-    Wallpaper(crate::wallpaper_ui::Picker),
+    Hub(crate::hub::Hub),
     WindowsOptions(crate::windows_options_ui::Settings),
     ThemePreview(crate::theme_preview_ui::Preview),
     QuickTheme(crate::quick_theme_ui::QuickTheme),
     Compare(crate::style_compare_ui::Comparison),
     Precache(crate::precache::Progress),
     Online(crate::online_ui::Online),
-    Settings(crate::settings_ui::BarSettings),
+}
+impl Scene {
+    pub fn picker(&self) -> Option<&crate::wallpaper_ui::Picker> {
+        match self {
+            Scene::Hub(hub) => hub.picker.as_ref(),
+            _ => None,
+        }
+    }
+    pub fn picker_mut(&mut self) -> Option<&mut crate::wallpaper_ui::Picker> {
+        match self {
+            Scene::Hub(hub) => hub.picker.as_mut(),
+            _ => None,
+        }
+    }
+    pub fn settings_mut(&mut self) -> Option<&mut crate::settings_ui::BarSettings> {
+        match self {
+            Scene::Hub(hub) => Some(&mut hub.settings),
+            _ => None,
+        }
+    }
 }
 pub enum NativeEvent {
     Dismiss(usize),
@@ -99,6 +118,7 @@ impl State {
             scale: self.scale,
             width,
             height,
+            origin: (0, 0),
             ui: self.palette,
             resources: &mut self.resources,
             root: &self.root,
@@ -142,7 +162,7 @@ impl State {
             Scene::Power(p) => self.hits = views::power(&mut c, p, self.hover),
             Scene::Wifi(v) => self.hits = crate::wifi_ui::paint(&mut c, v, self.hover),
             Scene::Sheet(v) => self.hits = crate::sheet::paint(&mut c, v, self.hover),
-            Scene::Settings(v) => self.hits = crate::settings_ui::paint(&mut c, v, self.hover),
+            Scene::Hub(v) => self.hits = crate::hub::paint(&mut c, v, self.hover),
             Scene::ThemePreview(v) => crate::theme_preview_ui::paint(&mut c, v),
             Scene::QuickTheme(v) => self.hits = crate::quick_theme_ui::paint(&mut c, v, self.hover),
             Scene::Precache(v) => self.hits = crate::precache::paint(&mut c, v, self.hover),
@@ -150,15 +170,6 @@ impl State {
             Scene::Compare(v) => self.hits = crate::style_compare_ui::paint(&mut c, v, self.hover),
             Scene::WindowsOptions(v) => {
                 self.hits = crate::windows_options_ui::paint(&mut c, v, self.hover)
-            }
-            Scene::Wallpaper(v) => {
-                self.hits = crate::wallpaper_ui::paint(&mut c, v, self.hover)
-                    .into_iter()
-                    .map(|h| Hit {
-                        rect: h.rect,
-                        action: Action::Picker(h.action),
-                    })
-                    .collect()
             }
         }
     }
@@ -465,7 +476,7 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
             return DefWindowProcW(h, m, wp, lp);
         };
         match m {
-            WM_NCHITTEST if matches!(s.scene, Scene::Sheet(_) | Scene::Settings(_)) => {
+            WM_NCHITTEST if matches!(s.scene, Scene::Sheet(_) | Scene::Hub(_)) => {
                 let mut pos = POINT {
                     x: (lp as u16) as i16 as i32,
                     y: ((lp >> 16) as u16) as i16 as i32,
@@ -473,18 +484,18 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 ScreenToClient(h, &mut pos);
                 let mut r = RECT::default();
                 GetClientRect(h, &mut r);
-                let right_margin = if matches!(s.scene, Scene::Sheet(_)) {
-                    276.
+                let (right_margin, top_margin, left_margin) = if matches!(s.scene, Scene::Sheet(_))
+                {
+                    (276., 94., 0.)
                 } else {
-                    110.
+                    // Keep the tab strip and close button clickable; the empty
+                    // strip between them still drags the window.
+                    (120., crate::hub::HEADER_HEIGHT, 300.)
                 };
-                let top_margin = if matches!(s.scene, Scene::Sheet(_)) {
-                    94.
-                } else {
-                    68.
-                };
-                if pos.y < (top_margin * s.scale).round_ties_even() as i32
-                    && pos.x < r.right - (right_margin * s.scale).round_ties_even() as i32
+                let scale = s.scale;
+                if pos.y < (top_margin * scale).round_ties_even() as i32
+                    && pos.x < r.right - (right_margin * scale).round_ties_even() as i32
+                    && pos.x > (left_margin * scale).round_ties_even() as i32
                 {
                     return HTCAPTION as isize;
                 }
@@ -504,7 +515,7 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 }
                 return 0;
             }
-            WM_MOUSEWHEEL if matches!(s.scene, Scene::Wallpaper(_)) => {
+            WM_MOUSEWHEEL if matches!(&s.scene, Scene::Hub(v) if v.is_theme_tab()) => {
                 let delta = (wp >> 16) as i16;
                 if delta != 0 {
                     s.send(NativeEvent::Action(
@@ -740,6 +751,17 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 return 0;
             }
             WM_KEYDOWN => {
+                if wp == VK_TAB as usize && GetAsyncKeyState(VK_CONTROL as i32) < 0 {
+                    if let Scene::Hub(v) = &s.scene {
+                        let next = if v.is_theme_tab() {
+                            crate::hub::Tab::Settings
+                        } else {
+                            crate::hub::Tab::Theme
+                        };
+                        s.send(NativeEvent::Action(h as usize, Action::HubTab(next)));
+                        return 0;
+                    }
+                }
                 if wp == VK_ESCAPE as usize {
                     s.send(NativeEvent::Action(h as usize, Action::Close));
                     return 0;
@@ -808,7 +830,8 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                         s.send(NativeEvent::Action(h as usize, Action::Online(edit)));
                     }
                 }
-                if matches!(s.scene, Scene::Wallpaper(_)) {
+                let hub_theme = matches!(&s.scene, Scene::Hub(v) if v.is_theme_tab());
+                if hub_theme {
                     if wp == VK_RETURN as usize {
                         s.send(NativeEvent::Action(
                             h as usize,
@@ -844,7 +867,9 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                         Action::WindowsOption(crate::windows_options_ui::Edit::Save),
                     ));
                 }
-                if matches!(s.scene, Scene::Settings(_)) && wp == VK_RETURN as usize {
+                if matches!(&s.scene, Scene::Hub(v) if !v.is_theme_tab())
+                    && wp == VK_RETURN as usize
+                {
                     s.send(NativeEvent::Action(
                         h as usize,
                         Action::Settings(crate::settings_ui::Edit::Save),
@@ -1153,20 +1178,31 @@ pub fn validate(root: PathBuf) -> anyhow::Result<()> {
     );
     window.wifi_layout(true);
     anyhow::ensure!(window.wifi_secret().is_empty(), "Password was not cleared");
-    window.state.borrow_mut().scene = Scene::Wallpaper(crate::wallpaper_ui::Picker::load(&root)?);
-    window.bounds(Rect::new(-32000, -32000, 1000, 590));
+    window.state.borrow_mut().scene =
+        Scene::Hub(crate::hub::Hub::new(&root, crate::hub::Tab::Theme));
+    window.bounds(Rect::new(-32000, -32000, 1000, 660));
     unsafe {
         let dc = GetDC(handle);
-        window.state.borrow_mut().paint(dc, 1000, 590);
+        window.state.borrow_mut().paint(dc, 1000, 660);
         ReleaseDC(handle, dc);
         let previous = GetCursor();
-        SendMessageW(handle, WM_MOUSEMOVE, 0, (30isize << 16) | 160);
+        SendMessageW(
+            handle,
+            WM_MOUSEMOVE,
+            0,
+            ((30 + crate::hub::HEADER_HEIGHT as i32) as isize) << 16 | 160,
+        );
         anyhow::ensure!(
             GetCursor() == LoadCursorW(null_mut(), IDC_HAND),
             "Picker toggle does not show hand cursor"
         );
         SetCursor(previous);
-        SendMessageW(handle, WM_LBUTTONUP, 0, (30isize << 16) | 160);
+        SendMessageW(
+            handle,
+            WM_LBUTTONUP,
+            0,
+            ((30 + crate::hub::HEADER_HEIGHT as i32) as isize) << 16 | 160,
+        );
         SendMessageW(handle, WM_KEYDOWN, VK_RIGHT as usize, 0);
         SendMessageW(handle, WM_MOUSEWHEEL, (120usize) << 16, 0);
         SendMessageW(handle, WM_KEYDOWN, VK_RETURN as usize, 0);

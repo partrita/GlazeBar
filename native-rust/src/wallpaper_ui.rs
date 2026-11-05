@@ -48,7 +48,6 @@ pub enum Action {
     Light(bool),
     Online,
     Folder,
-    Target(usize),
     PreviewTab(crate::theme_preview_ui::PreviewTab),
     Windows,
     #[allow(dead_code)] // Legacy Aether cache screen; no longer exposed in the UI.
@@ -329,7 +328,9 @@ fn toggle(
         hits.push(Hit { rect: r, action });
     }
 }
-pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> {
+/// `chrome` is false when embedded in the settings hub, which supplies the
+/// window close button in its shared tab strip.
+pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool) -> Vec<Hit> {
     let mut hits = vec![];
     let scale = c.scale;
     let s = |n: f64| (n * scale).round_ties_even() as i32;
@@ -415,16 +416,18 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         p.busy,
     );
     // 창닫기 버튼
-    button(
-        c,
-        &mut hits,
-        "닫기 ✕",
-        Rect::new(w - s(62.), s(18.), s(52.), s(30.)),
-        false,
-        Action::Close,
-        hover,
-        false,
-    );
+    if chrome {
+        button(
+            c,
+            &mut hits,
+            "닫기 ✕",
+            Rect::new(w - s(62.), s(18.), s(52.), s(30.)),
+            false,
+            Action::Close,
+            hover,
+            false,
+        );
+    }
 
     // Smaller, refined preview
     let mw = (f64::from(w) * 0.46) as i32;
@@ -564,22 +567,29 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         );
     }
 
-    // Targets line (동기화 타깃 토글 칩: GlazeBar, Terminal, Codex CLI, VS Code, Windows)
+    // 적용 대상은 일반 설정 탭에서 관리한다. 여기서는 현재 상태만 보여준다.
     let bottom_row1_y = h - s(84.);
-    for (i, label) in ["GlazeBar", "Terminal", "Codex CLI", "VS Code"]
+    let names = ["GlazeBar", "Terminal", "Codex CLI", "VS Code"];
+    let enabled: Vec<&str> = names
         .iter()
-        .enumerate()
-    {
-        toggle(
-            c,
-            &mut hits,
-            label,
-            Rect::new(s((24 + i * 86) as f64), bottom_row1_y, s(84.), s(30.)),
-            p.targets[i],
-            Action::Target(i),
-            p.busy,
-        );
-    }
+        .zip(p.targets)
+        .filter_map(|(name, on)| on.then_some(*name))
+        .collect();
+    c.text(
+        &format!(
+            "적용 대상: {} (± 일반 설정 탭에서 변경)",
+            if enabled.is_empty() {
+                "없음".to_string()
+            } else {
+                enabled.join(", ")
+            }
+        ),
+        Rect::new(s(24.), bottom_row1_y, s(330.), s(30.)),
+        c.ui.muted,
+        11.5,
+        false,
+        0,
+    );
     button(
         c,
         &mut hits,
@@ -588,7 +598,7 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>) -> Vec<Hit> 
         } else {
             "Windows · 끔"
         },
-        Rect::new(s(374.), bottom_row1_y, s(94.), s(30.)),
+        Rect::new(s(360.), bottom_row1_y, s(110.), s(30.)),
         p.windows,
         Action::Windows,
         hover,

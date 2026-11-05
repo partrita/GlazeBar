@@ -190,12 +190,19 @@ pub struct Canvas<'a> {
     pub scale: f64,
     pub width: i32,
     pub height: i32,
+    /// Screen-space offset added to every drawing call. Allows a screen to be
+    /// composed inside a viewport without rewriting its layout coordinates.
+    pub origin: (i32, i32),
     pub ui: Palette,
     pub resources: &'a mut Resources,
     pub root: &'a Path,
 }
 impl Canvas<'_> {
+    fn at(&self, r: Rect) -> Rect {
+        Rect::new(r.x + self.origin.0, r.y + self.origin.1, r.w, r.h)
+    }
     pub fn round_rect(&self, r: Rect, col: Color, diameter: i32) {
+        let r = self.at(r);
         unsafe {
             let brush = CreateSolidBrush(col);
             let old = SelectObject(self.dc, brush);
@@ -210,6 +217,7 @@ impl Canvas<'_> {
         (n * self.scale).round_ties_even() as i32
     }
     pub fn fill(&self, r: Rect, col: Color) {
+        let r = self.at(r);
         unsafe {
             let b = CreateSolidBrush(col);
             FillRect(self.dc, &r.native(), b);
@@ -224,6 +232,7 @@ impl Canvas<'_> {
     }
     pub fn text(&mut self, s: &str, r: Rect, col: Color, size: f64, bold: bool, align: u32) {
         let font = self.resources.font(self.p(size), bold);
+        let mut r = self.at(r).native();
         unsafe {
             let old = SelectObject(self.dc, font);
             SetBkMode(self.dc, TRANSPARENT as i32);
@@ -232,7 +241,7 @@ impl Canvas<'_> {
                 self.dc,
                 wide(s).as_ptr(),
                 -1,
-                &mut r.native(),
+                &mut r,
                 DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | align,
             );
             SelectObject(self.dc, old);
@@ -255,6 +264,7 @@ impl Canvas<'_> {
         }
     }
     pub fn ellipse(&self, r: Rect, col: Color) {
+        let r = self.at(r);
         unsafe {
             let b = CreateSolidBrush(col);
             let ob = SelectObject(self.dc, b);
@@ -315,7 +325,7 @@ impl Canvas<'_> {
             );
             self.resources.icons.insert(key.clone(), pixels);
         }
-        let bg = unsafe { GetPixel(self.dc, r.x, r.y) };
+        let bg = unsafe { GetPixel(self.dc, r.x + self.origin.0, r.y + self.origin.1) };
         let blend_key = (name.to_string(), r.w, col, bg);
         if !self.resources.blended_icons.contains_key(&blend_key) {
             let pixels = &self.resources.icons[&key];
@@ -336,6 +346,7 @@ impl Canvas<'_> {
         self.bitmap(r, r.w, r.h, data);
     }
     pub fn bitmap(&self, r: Rect, w: i32, h: i32, bgra: &[u8]) {
+        let r = self.at(r);
         let mut info = BITMAPINFO::default();
         info.bmiHeader = BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
@@ -385,6 +396,7 @@ pub fn render_png(
                 scale,
                 width,
                 height,
+                origin: (0, 0),
                 ui,
                 resources: &mut resources,
                 root,

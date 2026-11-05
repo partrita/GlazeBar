@@ -10,6 +10,7 @@ mod go_sort;
 mod go_upper_table;
 mod graphics;
 mod hooks;
+mod hub;
 mod ipc;
 mod online_preferences;
 mod online_ui;
