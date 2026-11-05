@@ -1,32 +1,32 @@
-GlazeBar + GlazeWM 0.1.0-preview.7 — Windows 11 x64 / ARM64
+======================================================================
+  GlazeBar + GlazeWM 커뮤니티 설치 프로그램 (Community Bundle)
+======================================================================
 
-GlazeBar와 수정 GlazeWM 3.10.1-glazebar.2를 설치하는 커뮤니티 번들입니다.
-PC에 맞는 설치 프로그램을 사용하고 실행 중인 GlazeWM과 GlazeBar를 종료하세요.
-이전 커뮤니티 번들은 먼저 제거하고 사용자 설정 백업을 보관하세요.
+[설치 전 확인 사항]
+• 실행 중인 GlazeWM 또는 GlazeBar가 있다면 미리 종료해 주세요.
+• 기존 커뮤니티 번들이 설치되어 있다면 이전 버전을 제거한 후 설치를 진행해 주세요.
+• 기존 설정 및 파일은 설치 중 자동으로 안전하게 백업됩니다.
 
-설치 위치: %USERPROFILE%\.glzr\glazewm
-백업 위치: %USERPROFILE%\.glzr\community-backups
-기존 파일을 백업하며 다른 GlazeWM 버전을 임의로 교체하지 않습니다.
-GlazeWM의 Visual C++ 런타임이 없으면 Microsoft에서 내려받아 서명을 확인하고
-설치 화면을 표시합니다. 인터넷과 관리자 권한 확인이 필요할 수 있습니다.
-로그인 시 자동 시작은 다음 화면에서 선택합니다.
-설치 후 시작 메뉴의 GlazeBar + GlazeWM을 실행하세요.
+[주요 설치 경로]
+• 프로그램 설치 위치 : %USERPROFILE%\.glzr\glazewm
+• 사용자 설정 백업   : %USERPROFILE%\.glzr\community-backups
 
-이번 버전은 창을 옮길 때 GlazeWM이 "No workspace is currently focused."
-"Focused container has no monitor." 오류를 반복하던 문제를 수정합니다.
+[핵심 안내]
+1. Visual C++ 런타임:
+   필요 시 Microsoft 공식 서버에서 서명된 정품 런타임을 안전하게 내려받아 설치합니다.
+2. 윈도우 시작 시 자동 실행:
+   다음 설정 화면에서 자동 실행 여부를 체크 박스로 손쉽게 지정할 수 있습니다.
+3. 안정성 개선:
+   창 이동 시 발생하던 포커스 오류(No workspace focused 등)가 수정되었습니다.
+4. 삭제 및 복원:
+   제거 시 'Windows 설정 > 설치된 앱'에서 삭제할 수 있으며, 기존 설정이 자동으로 원상 복원됩니다.
 
-제거 시 Windows 설정 > 앱에서 커뮤니티 번들을 제거하세요.
-설치 전 파일을 복원하고 설치 후 수정한 파일은 별도 보관합니다.
-백업·캐시, 공식 GlazeWM, 적용한 Windows 색상·배경화면은 유지합니다.
-
-ARM64 패키지는 x64에서 교차 빌드했습니다. 코드 서명은 없습니다.
-GlazeBar 및 설치 스크립트는 GPL-3.0-only이며 제삼자 라이선스를 유지합니다.
-대응 소스와 고지는 설치 폴더의 bundle/source, bundle/licenses, setup-source에 있습니다.
-날씨는 서울 기준이며 Open-Meteo 무료 API의 비상업용 조건이 적용됩니다.
-
-English: This community bundle installs GlazeBar and modified GlazeWM.
-Close both programs and uninstall an older community bundle before updating.
-Keep configuration backups. This version fixes repeated "No workspace is currently
-focused" / "Focused container has no monitor" errors in GlazeWM after moving windows.
-The ARM64 package is cross-built on x64. Corresponding source and licenses are included.
-See the repository for details: https://github.com/lamininA1/GlazeBar
+----------------------------------------------------------------------
+[English Summary]
+• Community bundle installing GlazeBar and optimized GlazeWM.
+• Please close any running GlazeWM/GlazeBar instances before proceeding.
+• Existing configurations will be automatically backed up to %USERPROFILE%\.glzr\community-backups.
+• Windows Auto-start option is available in the next task selection page.
+• Complete sources, license notices (GPL-3.0-only), and documentation are located in the installation folder.
+• Project repository: https://github.com/partrita/GlazeBar
+======================================================================

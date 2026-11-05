@@ -127,7 +127,7 @@ var
   Code: Integer;
   Args: String;
 begin
-  Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+  Args := '-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' +
     BasePath + '\Setup-Bridge.ps1' + '" -Action ' + Action +
     ' -Bundle "' + BasePath + '\bundle' + '"';
   if Action = 'Install' then
