@@ -2039,6 +2039,7 @@ pub fn run_with_popup(
                     Action::Picker(action) => {
                         let mut close_wallpaper = false;
                         if let Some(w) = popup.as_ref().filter(|w| w.hwnd as usize == hwnd) {
+                            let mut sync_targets_to: Option<[bool; 16]> = None;
                             if let Some(p) = w.state.borrow_mut().scene.picker_mut() {
                                 if !p.busy {
                                     use crate::wallpaper_ui::Action as P;
@@ -2056,6 +2057,12 @@ pub fn run_with_popup(
                                             p.open_dropdown = None;
                                             if p.mode != m {
                                                 p.mode = m;
+                                                let scheme =
+                                                    crate::wallpaper_ui::SCHEME_IDS[p.mode.min(
+                                                        crate::wallpaper_ui::SCHEME_IDS.len() - 1,
+                                                    )];
+                                                p.palette =
+                                                    crate::color_schemes::palette(scheme, p.light);
                                             } else {
                                                 extract = false;
                                             }
@@ -2075,6 +2082,21 @@ pub fn run_with_popup(
                                         P::Light(light) => {
                                             p.open_dropdown = None;
                                             p.light = light;
+                                            let scheme = crate::wallpaper_ui::SCHEME_IDS[p
+                                                .mode
+                                                .min(crate::wallpaper_ui::SCHEME_IDS.len() - 1)];
+                                            p.palette =
+                                                crate::color_schemes::palette(scheme, p.light);
+                                        }
+                                        P::ToggleTarget(idx) => {
+                                            p.toggle_target(idx);
+                                            sync_targets_to = Some(p.all_targets());
+                                            extract = false;
+                                        }
+                                        P::SelectAllTargets(enabled) => {
+                                            p.select_all_targets(enabled);
+                                            sync_targets_to = Some(p.all_targets());
+                                            extract = false;
                                         }
                                         P::PreviewTab(tab) => {
                                             p.preview_tab = tab;
@@ -2092,10 +2114,20 @@ pub fn run_with_popup(
                                     if extract {
                                         wallpaper_worker.request(hwnd, p);
                                     }
-                                    if !close_wallpaper {
-                                        w.invalidate();
-                                    }
                                 }
+                            }
+                            if let Some(targets) = sync_targets_to {
+                                if let Some(s) = w.state.borrow_mut().scene.settings_mut() {
+                                    s.targets = targets;
+                                    let _ = s.save(&root);
+                                } else {
+                                    let mut s = crate::settings_ui::BarSettings::load(&root);
+                                    s.targets = targets;
+                                    let _ = s.save(&root);
+                                }
+                            }
+                            if !close_wallpaper {
+                                w.invalidate();
                             }
                         }
                         if close_wallpaper {
@@ -2132,14 +2164,14 @@ pub fn run_with_popup(
                                                 }
                                             }
                                             v.status =
-                                                "기본 편집기로 config.yaml 파일을 열었습니다."
+                                                "✓ 기본 편집기로 config.yaml 파일을 열었습니다."
                                                     .into();
                                         }
                                         E::ReloadGlazeWM => {
                                             let _ = v.save(&root);
                                             reload_wm = true;
                                             v.status =
-                                                "설정을 저장하고 GlazeWM에 다시 적용했습니다."
+                                                "✓ 설정을 저장하고 GlazeWM에 다시 적용했습니다."
                                                     .into();
                                         }
                                         E::OpenSheet => {
@@ -2156,13 +2188,21 @@ pub fn run_with_popup(
                                         other => {
                                             v.apply_edit(other);
                                             let _ = v.save(&root);
-                                            if matches!(other, E::CycleCity) {
+                                            if matches!(other, E::CycleCity | E::SetCity(_)) {
                                                 city_changed = Some(v.weather_city);
                                             }
-                                            if matches!(other, E::CycleTerminal | E::CycleBrowser) {
+                                            if matches!(
+                                                other,
+                                                E::CycleTerminal
+                                                    | E::SetTerminal(_)
+                                                    | E::CycleBrowser
+                                                    | E::SetBrowser(_)
+                                                    | E::ToggleAutoSplit
+                                                    | E::SetAutoSplit(_)
+                                            ) {
                                                 reload_wm = true;
                                             }
-                                            if matches!(other, E::CycleOpacity) {
+                                            if matches!(other, E::CycleOpacity | E::SetOpacity(_)) {
                                                 for b in bars.values() {
                                                     b.window.set_opacity(
                                                         crate::settings_ui::OPACITY_STEPS
@@ -2171,7 +2211,10 @@ pub fn run_with_popup(
                                                     );
                                                 }
                                             }
-                                            if matches!(other, E::CycleClockFormat) {
+                                            if matches!(
+                                                other,
+                                                E::CycleClockFormat | E::SetClockFormat(_)
+                                            ) {
                                                 let new_clk =
                                                     views::clock_formatted(v.clock_format_idx);
                                                 for b in bars.values() {
@@ -2188,17 +2231,32 @@ pub fn run_with_popup(
                                 }
                             }
                         } else {
+                            use crate::settings_ui::Edit as E;
                             let mut s = crate::settings_ui::BarSettings::load(&root);
                             s.apply_edit(&edit);
                             let _ = s.save(&root);
-                            if matches!(&edit, crate::settings_ui::Edit::CycleOpacity) {
+                            if matches!(&edit, E::CycleCity | E::SetCity(_)) {
+                                city_changed = Some(s.weather_city);
+                            }
+                            if matches!(
+                                &edit,
+                                E::CycleTerminal
+                                    | E::SetTerminal(_)
+                                    | E::CycleBrowser
+                                    | E::SetBrowser(_)
+                                    | E::ToggleAutoSplit
+                                    | E::SetAutoSplit(_)
+                            ) {
+                                reload_wm = true;
+                            }
+                            if matches!(&edit, E::CycleOpacity | E::SetOpacity(_)) {
                                 for b in bars.values() {
                                     b.window.set_opacity(
                                         crate::settings_ui::OPACITY_STEPS[s.opacity_idx].1,
                                     );
                                 }
                             }
-                            if matches!(&edit, crate::settings_ui::Edit::CycleClockFormat) {
+                            if matches!(&edit, E::CycleClockFormat | E::SetClockFormat(_)) {
                                 let new_clk = views::clock_formatted(s.clock_format_idx);
                                 for b in bars.values() {
                                     if let Scene::Bar { clock: label, .. } =

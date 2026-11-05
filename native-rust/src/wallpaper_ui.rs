@@ -1,12 +1,14 @@
-use crate::graphics::{Canvas, Rect};
+use crate::{
+    graphics::{Canvas, Rect, blend, parse},
+    settings_ui::APP_LABELS,
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-/// Legacy Aether extraction styles. Kept for the engine, cache, and CLI paths,
-/// but no longer exposed in the interactive theme picker.
+/// Legacy Aether extraction styles. Kept for the engine, cache, and CLI paths.
 pub const MODES: [&str; 6] = [
     "normal",
     "muted",
@@ -33,11 +35,14 @@ pub const SCHEME_NAMES: [&str; 6] = [
     "Dracula",
     "Tokyo Night",
 ];
+
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Dropdown {
     Theme,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
     Select(i32),
@@ -49,18 +54,22 @@ pub enum Action {
     Online,
     Folder,
     PreviewTab(crate::theme_preview_ui::PreviewTab),
+    ToggleTarget(usize),
+    SelectAllTargets(bool),
     Windows,
-    #[allow(dead_code)] // Legacy Aether cache screen; no longer exposed in the UI.
+    #[allow(dead_code)]
     Precache,
     Compare,
     Restore,
     Apply,
     Close,
 }
+
 pub struct Hit {
     pub rect: Rect,
     pub action: Action,
 }
+
 #[derive(Clone)]
 pub struct Picker {
     pub operation: u64,
@@ -82,6 +91,7 @@ pub struct Picker {
     pub status: String,
     pub open_dropdown: Option<Dropdown>,
 }
+
 impl Picker {
     pub fn load(root: &Path) -> anyhow::Result<Self> {
         let home = PathBuf::from(
@@ -119,20 +129,24 @@ impl Picker {
             bar_settings.targets[2],
             bar_settings.targets[3],
         ];
-        let extra_targets = [
-            bar_settings.targets[4],
-            bar_settings.targets[5],
-            bar_settings.targets[6],
-            bar_settings.targets[7],
-            bar_settings.targets[8],
-            bar_settings.targets[9],
-            bar_settings.targets[10],
-            bar_settings.targets[11],
-            bar_settings.targets[12],
-            bar_settings.targets[13],
-            bar_settings.targets[14],
-            bar_settings.targets[15],
-        ];
+        let mut extra_targets = [true; 12];
+        extra_targets.copy_from_slice(&bar_settings.targets[4..16]);
+
+        let current_json_path = home.join(".glzr/glazewm/theme-state/current-palette.json");
+        let current_state: Option<serde_json::Value> = std::fs::read(&current_json_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok());
+        let light = current_state
+            .as_ref()
+            .and_then(|v| v["light"].as_bool())
+            .unwrap_or(false);
+        let mode = current_state
+            .as_ref()
+            .and_then(|v| v["mode"].as_str())
+            .and_then(|m| SCHEME_IDS.iter().position(|&id| id == m))
+            .unwrap_or(0);
+        let palette = crate::color_schemes::palette(SCHEME_IDS[mode], light);
+
         Ok(Self {
             operation: 0,
             revision: 0,
@@ -140,8 +154,8 @@ impl Picker {
             files,
             selected,
             images: HashMap::new(),
-            mode: 0,
-            light: false,
+            mode,
+            light,
             enabled: true,
             targets,
             extra_targets,
@@ -155,11 +169,34 @@ impl Picker {
             ),
             preview_tab: Default::default(),
             busy: false,
-            palette: None,
+            palette,
             status: String::new(),
             open_dropdown: None,
         })
     }
+
+    pub fn all_targets(&self) -> [bool; 16] {
+        let mut out = [true; 16];
+        out[..4].copy_from_slice(&self.targets);
+        out[4..16].copy_from_slice(&self.extra_targets);
+        out
+    }
+
+    pub fn toggle_target(&mut self, index: usize) {
+        if index < 4 {
+            self.targets[index] = !self.targets[index];
+        } else if index < 16 {
+            self.extra_targets[index - 4] = !self.extra_targets[index - 4];
+        }
+        self.status.clear();
+    }
+
+    pub fn select_all_targets(&mut self, enabled: bool) {
+        self.targets = [enabled; 4];
+        self.extra_targets = [enabled; 12];
+        self.status.clear();
+    }
+
     pub fn select(&mut self, delta: i32) {
         if !self.busy && !self.files.is_empty() {
             self.selected = (self.selected as i64 + i64::from(delta))
@@ -167,6 +204,7 @@ impl Picker {
             self.status.clear();
         }
     }
+
     pub fn neighbors(&self) -> Vec<PathBuf> {
         if self.files.is_empty() {
             return vec![];
@@ -185,13 +223,14 @@ impl Picker {
 pub fn thumbnail(path: &Path) -> anyhow::Result<image::RgbaImage> {
     thumbnail_in(path, crate::ui_cache::directory("thumbnail").as_deref())
 }
+
 pub(crate) fn thumbnail_in(path: &Path, dir: Option<&Path>) -> anyhow::Result<image::RgbaImage> {
     let key = crate::ui_cache::thumbnail_key(path);
     let cache = dir
         .zip(key.as_deref())
         .map(|(dir, key)| dir.join(format!("{key}.jpg")));
     if let Some(cache) = &cache {
-        if let Ok(image) = read_thumbnail(&cache, true) {
+        if let Ok(image) = read_thumbnail(cache, true) {
             return Ok(image);
         }
     }
@@ -221,6 +260,7 @@ pub(crate) fn thumbnail_in(path: &Path, dir: Option<&Path>) -> anyhow::Result<im
     }
     Ok(image)
 }
+
 fn read_thumbnail(path: &Path, cached: bool) -> anyhow::Result<image::RgbaImage> {
     use image::ImageDecoder;
     let decoder = image::ImageReader::open(path)?
@@ -270,6 +310,7 @@ fn crop(c: &Canvas, im: &image::RgbaImage, r: Rect, dim: bool) {
         SetStretchBltMode(c.dc, previous);
     }
 }
+
 fn button(
     c: &mut Canvas,
     hits: &mut Vec<Hit>,
@@ -281,7 +322,6 @@ fn button(
     busy: bool,
 ) {
     let over = hover.is_some_and(|(x, y)| r.contains(x, y));
-    // Go keeps the normal appearance while a picker operation is busy.
     crate::views::button(
         c,
         &mut vec![],
@@ -296,38 +336,139 @@ fn button(
         hits.push(Hit { rect: r, action });
     }
 }
-fn toggle(
+
+fn draw_scheme_card(
     c: &mut Canvas,
     hits: &mut Vec<Hit>,
-    label: &str,
     r: Rect,
-    checked: bool,
-    action: Action,
+    index: usize,
+    light: bool,
+    selected: bool,
+    hover: Option<(i32, i32)>,
     busy: bool,
 ) {
-    let side = c.p(10.);
-    let y = r.y + (r.h - side) / 2;
-    let col = if checked { c.ui.accent } else { c.ui.border };
-    c.frame(Rect::new(r.x, y, side, side), col);
-    if checked {
-        let inset = c.p(3.);
-        c.fill(
-            Rect::new(r.x + inset, y + inset, side - 2 * inset, side - 2 * inset),
-            col,
+    let scale = c.scale;
+    let s = |n: f64| (n * scale).round_ties_even() as i32;
+    let id = SCHEME_IDS[index];
+    let name = SCHEME_NAMES[index];
+    let pal = crate::color_schemes::palette(id, light);
+    let over = hover.is_some_and(|(x, y)| r.contains(x, y));
+
+    let card_bg = pal.as_ref().map(|p| parse(&p[0])).unwrap_or(c.ui.bg);
+    let card_fg = pal.as_ref().map(|p| parse(&p[15])).unwrap_or(c.ui.text);
+
+    c.fill(
+        r,
+        if over {
+            blend(card_bg, 0xFFFFFF, if light { 0.06 } else { 0.10 })
+        } else {
+            card_bg
+        },
+    );
+
+    let border_col = if selected {
+        c.ui.accent
+    } else if over {
+        c.ui.text
+    } else {
+        c.ui.border
+    };
+    let border_w = if selected { s(2.).max(2) } else { 1 };
+    for inset in 0..border_w {
+        c.frame(
+            Rect::new(r.x + inset, r.y + inset, r.w - 2 * inset, r.h - 2 * inset),
+            border_col,
         );
     }
+
+    let title = if selected {
+        format!("✓ {name}")
+    } else {
+        name.to_string()
+    };
     c.text(
-        label,
-        Rect::new(r.x + side + c.p(8.), r.y, r.w - side - c.p(8.), r.h),
-        c.ui.text,
-        12.,
-        false,
-        0,
+        &title,
+        Rect::new(r.x + s(8.), r.y + s(6.), r.w - s(16.), s(20.)),
+        if selected { c.ui.accent } else { card_fg },
+        11.5,
+        selected,
+        1,
     );
+
+    if let Some(p) = pal {
+        let swatch_cols = [&p[1], &p[2], &p[3], &p[4], &p[5], &p[6]];
+        let sw_gap = s(4.);
+        let total_w = r.w - s(20.);
+        let sw_w = (total_w - sw_gap * 5) / 6;
+        let sw_h = s(14.);
+        let sw_y = r.y + r.h - sw_h - s(8.);
+        let start_x = r.x + (r.w - (sw_w * 6 + sw_gap * 5)) / 2;
+        for (k, hex) in swatch_cols.into_iter().enumerate() {
+            let sr = Rect::new(start_x + k as i32 * (sw_w + sw_gap), sw_y, sw_w, sw_h);
+            c.fill(sr, parse(hex));
+        }
+    }
+
     if !busy {
-        hits.push(Hit { rect: r, action });
+        hits.push(Hit {
+            rect: r,
+            action: Action::SetMode(index),
+        });
     }
 }
+
+fn draw_app_pill(
+    c: &mut Canvas,
+    hits: &mut Vec<Hit>,
+    r: Rect,
+    label: &str,
+    checked: bool,
+    index: usize,
+    hover: Option<(i32, i32)>,
+    busy: bool,
+) {
+    let over = hover.is_some_and(|(x, y)| r.contains(x, y));
+    let bg = if checked {
+        if over {
+            blend(c.ui.selected, c.ui.accent, 0.25)
+        } else {
+            blend(c.ui.surface, c.ui.accent, 0.16)
+        }
+    } else if over {
+        c.ui.hover
+    } else {
+        c.ui.bg
+    };
+    c.fill(r, bg);
+    c.frame(
+        r,
+        if checked {
+            blend(c.ui.border, c.ui.accent, 0.6)
+        } else {
+            c.ui.border
+        },
+    );
+    let text = if checked {
+        format!("✓ {label}")
+    } else {
+        label.to_string()
+    };
+    c.text(
+        &text,
+        r,
+        if checked { c.ui.text } else { c.ui.muted },
+        11.,
+        checked,
+        1,
+    );
+    if !busy {
+        hits.push(Hit {
+            rect: r,
+            action: Action::ToggleTarget(index),
+        });
+    }
+}
+
 /// `chrome` is false when embedded in the settings hub, which supplies the
 /// window close button in its shared tab strip.
 pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool) -> Vec<Hit> {
@@ -337,69 +478,81 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool
     let w = c.width;
     let h = c.height;
 
-    // Title
+    if chrome {
+        button(
+            c,
+            &mut hits,
+            "닫기 ✕",
+            Rect::new(w - s(76.), s(12.), s(52.), s(28.)),
+            false,
+            Action::Close,
+            hover,
+            false,
+        );
+    }
+
+    // =========================================================================
+    // Card 1: 배경화면 탐색 및 미리보기
+    // =========================================================================
+    let sec1 = Rect::new(s(24.), s(12.), w - s(48.), s(248.));
+    c.round_rect(sec1, c.ui.surface, s(8.));
+
     c.text(
-        "배경화면",
-        Rect::new(s(28.), s(19.), s(90.), s(28.)),
-        c.ui.text,
-        17.,
+        "배경화면 선택",
+        Rect::new(s(38.), s(20.), s(120.), s(28.)),
+        c.ui.accent,
+        12.5,
         true,
         0,
     );
 
-    // 테마 색상 함께 적용 토글
-    toggle(
+    if !p.files.is_empty() {
+        let raw_name = p.files[p.selected]
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let display_name = if raw_name == "TranscodedWallpaper" {
+            "현재 배경화면"
+        } else {
+            &raw_name
+        };
+        c.text(
+            &format!(
+                "{} / {}  ·  {}",
+                p.selected + 1,
+                p.files.len(),
+                display_name
+            ),
+            Rect::new(s(154.), s(20.), s(360.), s(28.)),
+            c.ui.text,
+            11.5,
+            false,
+            0,
+        );
+    }
+
+    // Top-right controls inside Card 1
+    let sync_toggle_r = Rect::new(w - s(450.), s(20.), s(188.), s(28.));
+    button(
         c,
         &mut hits,
-        "테마 색상 함께 적용",
-        Rect::new(s(122.), s(18.), s(156.), s(30.)),
+        if p.enabled {
+            "✓ 테마 색상 함께 적용"
+        } else {
+            "배경화면만 변경 (테마 유지)"
+        },
+        sync_toggle_r,
         p.enabled,
         Action::Enabled,
-        p.busy,
-    );
-
-    // 정의된 컬러 스킴 선택 드롭다운
-    let theme_name = SCHEME_NAMES[p.mode.min(SCHEME_NAMES.len() - 1)];
-    let theme_rect = Rect::new(s(288.), s(18.), s(170.), s(30.));
-    button(
-        c,
-        &mut hits,
-        &format!("테마: {theme_name} ▾"),
-        theme_rect,
-        p.open_dropdown == Some(Dropdown::Theme),
-        Action::ToggleDropdown(Dropdown::Theme),
         hover,
         p.busy,
     );
 
-    // 다크 / 라이트 선택
     button(
         c,
         &mut hits,
-        "다크",
-        Rect::new(s(472.), s(18.), s(58.), s(30.)),
-        !p.light,
-        Action::Light(false),
-        hover,
-        p.busy,
-    );
-    button(
-        c,
-        &mut hits,
-        "라이트",
-        Rect::new(s(534.), s(18.), s(58.), s(30.)),
-        p.light,
-        Action::Light(true),
-        hover,
-        p.busy,
-    );
-
-    // Top-right action buttons: 온라인 찾기, 폴더 선택, 닫기
-    button(
-        c,
-        &mut hits,
-        "온라인 찾기",
-        Rect::new(w - s(256.), s(18.), s(94.), s(30.)),
+        "온라인 배경화면 (Wallhaven)",
+        Rect::new(w - s(254.), s(20.), s(134.), s(28.)),
         false,
         Action::Online,
         hover,
@@ -408,52 +561,75 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool
     button(
         c,
         &mut hits,
-        "폴더 선택",
-        Rect::new(w - s(156.), s(18.), s(88.), s(30.)),
+        "폴더 선택…",
+        Rect::new(w - s(112.), s(20.), s(76.), s(28.)),
         false,
         Action::Folder,
         hover,
         p.busy,
     );
-    // 창닫기 버튼
-    if chrome {
-        button(
-            c,
-            &mut hits,
-            "닫기 ✕",
-            Rect::new(w - s(62.), s(18.), s(52.), s(30.)),
-            false,
-            Action::Close,
-            hover,
-            false,
-        );
-    }
 
-    // Smaller, refined preview
-    let mw = (f64::from(w) * 0.46) as i32;
-    let mh = (f64::from(mw) * (9.0 / 16.0)) as i32;
-    let y = s(66.);
-    let side_w = s(36.).max((w - mw) / 2 - s(50.));
+    // 3-Card Wallpaper Carousel
+    let mh = s(186.);
+    let mw = (f64::from(mh) * (16.0 / 9.0)) as i32;
+    let y = s(58.);
+    let side_w = s(36.).max((w - mw) / 2 - s(82.));
     let center = Rect::new((w - mw) / 2, y, mw, mh);
     let cards = [
         Rect::new(
-            (w - mw) / 2 - side_w - s(16.),
-            y + s(14.),
+            (w - mw) / 2 - side_w - s(14.),
+            y + s(12.),
             side_w,
-            mh - s(28.),
+            mh - s(24.),
         ),
         center,
-        Rect::new((w - mw) / 2 + mw + s(16.), y + s(14.), side_w, mh - s(28.)),
+        Rect::new((w - mw) / 2 + mw + s(14.), y + s(12.), side_w, mh - s(24.)),
     ];
 
-    // Navigation buttons (◀, ▶) beside preview
-    let prev_rect = Rect::new((w - mw) / 2 - s(38.), y + (mh - s(32.)) / 2, s(30.), s(32.));
-    let next_rect = Rect::new(
-        (w - mw) / 2 + mw + s(8.),
-        y + (mh - s(32.)) / 2,
-        s(30.),
-        s(32.),
-    );
+    let prev_rect = Rect::new(s(36.), y + (mh - s(36.)) / 2, s(34.), s(36.));
+    let next_rect = Rect::new(w - s(70.), y + (mh - s(36.)) / 2, s(34.), s(36.));
+
+    if p.files.is_empty() {
+        c.fill(center, c.ui.bg);
+        c.frame(center, c.ui.border);
+        c.text(
+            "배경화면 폴더에 이미지가 없습니다. 우측 상단 [폴더 선택…]을 눌러주세요.",
+            center,
+            c.ui.muted,
+            12.,
+            false,
+            1,
+        );
+    } else {
+        for (i, r) in cards.into_iter().enumerate() {
+            if p.files.len() == 1 && i != 1 {
+                continue;
+            }
+            let index = (p.selected + i + p.files.len() - 1) % p.files.len();
+            c.fill(r, c.ui.bg);
+            if let Some(im) = p.images.get(&p.files[index]) {
+                crop(c, im, r, i != 1);
+            } else {
+                c.text("불러오는 중…", r, c.ui.muted, 11., false, 1);
+            }
+            let col = if i == 1 { c.ui.accent } else { c.ui.border };
+            let bw = if i == 1 { s(2.).max(2) } else { 1 };
+            for inset in 0..bw {
+                c.frame(
+                    Rect::new(r.x + inset, r.y + inset, r.w - 2 * inset, r.h - 2 * inset),
+                    col,
+                );
+            }
+            if i != 1 && !p.busy {
+                hits.push(Hit {
+                    rect: r,
+                    action: Action::Select(i as i32 - 1),
+                });
+            }
+        }
+    }
+
+    // Draw ◀ ▶ buttons after side cards so their hits take priority
     button(
         c,
         &mut hits,
@@ -475,158 +651,217 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool
         p.busy || p.files.is_empty(),
     );
 
-    if p.files.is_empty() {
-        c.text("사진 폴더를 선택해주세요", center, c.ui.text, 12., false, 1);
-    } else {
-        for (i, r) in cards.into_iter().enumerate() {
-            if p.files.len() == 1 && i != 1 {
-                continue;
-            }
-            let index = (p.selected + i + p.files.len() - 1) % p.files.len();
-            c.fill(r, c.ui.surface);
-            if let Some(im) = p.images.get(&p.files[index]) {
-                crop(c, im, r, i != 1);
-            }
-            let col = if i == 1 { c.ui.accent } else { c.ui.border };
-            let width = if i == 1 { s(3.) } else { 1 };
-            for inset in 0..width {
-                c.frame(
-                    Rect::new(r.x + inset, r.y + inset, r.w - 2 * inset, r.h - 2 * inset),
-                    col,
-                );
-            }
-            if i != 1 && !p.busy {
-                hits.push(Hit {
-                    rect: r,
-                    action: Action::Select(i as i32 - 1),
-                });
-            }
-        }
-        let label = p.files[p.selected]
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy();
-        c.text(
-            if label == "TranscodedWallpaper" {
-                "현재 배경화면"
-            } else {
-                &label
-            },
-            Rect::new(s(24.), y + mh + s(8.), w - s(48.), s(22.)),
-            c.ui.text,
-            12.,
-            false,
-            1,
-        );
-    }
+    // =========================================================================
+    // Card 2: 컬러 스킴 프리셋 (6종 원클릭 카드) 및 16색 팔레트
+    // =========================================================================
+    let sec2 = Rect::new(s(24.), s(268.), w - s(48.), s(146.));
+    c.round_rect(sec2, c.ui.surface, s(8.));
 
-    let palette_y = y + mh + s(34.);
-    if !p.enabled {
-        c.text(
-            "배경화면만 변경 (테마 색상 미적용)",
-            Rect::new(s(24.), palette_y, w - s(48.), s(18.)),
-            c.ui.muted,
-            12.,
-            false,
-            1,
-        );
-    } else if let Some(palette) = &p.palette {
-        let cell = (w - s(48.)) / 16;
-        for (i, col) in palette.iter().enumerate() {
-            c.fill(
-                Rect::new(s(24.) + i as i32 * cell, palette_y, cell + 1, s(18.)),
-                crate::graphics::parse(col),
-            );
-        }
-    }
-
-    // 프리뷰 탭 전환 버튼 (전체 / GlazeBar / Terminal / VS Code)
-    let preview_tabs = [
-        ("전체", crate::theme_preview_ui::PreviewTab::Overview),
-        ("GlazeBar", crate::theme_preview_ui::PreviewTab::GlazeBar),
-        ("Terminal", crate::theme_preview_ui::PreviewTab::Terminal),
-        ("VS Code", crate::theme_preview_ui::PreviewTab::VsCode),
-    ];
-    let tab_start_x = 24.;
-    let tab_w = 78.;
-    for (i, &(tab_label, tab_var)) in preview_tabs.iter().enumerate() {
-        button(
-            c,
-            &mut hits,
-            tab_label,
-            Rect::new(
-                s(tab_start_x + (i as f64 * (tab_w + 6.))),
-                palette_y + s(26.),
-                s(tab_w),
-                s(26.),
-            ),
-            p.preview_tab == tab_var,
-            Action::PreviewTab(tab_var),
-            hover,
-            p.busy,
-        );
-    }
-
-    // 적용 대상은 일반 설정 탭에서 관리한다. 여기서는 현재 상태만 보여준다.
-    let bottom_row1_y = h - s(84.);
-    let names = ["GlazeBar", "Terminal", "Codex CLI", "VS Code"];
-    let enabled: Vec<&str> = names
-        .iter()
-        .zip(p.targets)
-        .filter_map(|(name, on)| on.then_some(*name))
-        .collect();
     c.text(
-        &format!(
-            "적용 대상: {} (± 일반 설정 탭에서 변경)",
-            if enabled.is_empty() {
-                "없음".to_string()
-            } else {
-                enabled.join(", ")
-            }
-        ),
-        Rect::new(s(24.), bottom_row1_y, s(330.), s(30.)),
+        "컬러 스킴 프리셋",
+        Rect::new(s(38.), s(276.), s(150.), s(26.)),
+        c.ui.accent,
+        12.5,
+        true,
+        0,
+    );
+    c.text(
+        if p.enabled {
+            "원하는 스킴 카드를 클릭하면 하단 16색 팔레트가 즉시 전환됩니다"
+        } else {
+            "현재 '배경화면만 변경' 상태입니다 (테마 색상을 적용하려면 상단 옵션을 켜세요)"
+        },
+        Rect::new(s(182.), s(276.), s(520.), s(26.)),
         c.ui.muted,
-        11.5,
+        11.,
         false,
         0,
+    );
+
+    button(
+        c,
+        &mut hits,
+        "다크 모드 (Dark)",
+        Rect::new(w - s(248.), s(275.), s(102.), s(26.)),
+        !p.light,
+        Action::Light(false),
+        hover,
+        p.busy,
     );
     button(
         c,
         &mut hits,
+        "라이트 모드 (Light)",
+        Rect::new(w - s(140.), s(275.), s(104.), s(26.)),
+        p.light,
+        Action::Light(true),
+        hover,
+        p.busy,
+    );
+
+    // 6 Visual Scheme Cards
+    let cards_w = w - s(76.);
+    let card_gap = s(8.);
+    let scheme_w = (cards_w - card_gap * 5) / 6;
+    let scheme_h = s(54.);
+    let scheme_y = s(308.);
+    let active_mode = p.mode.min(SCHEME_IDS.len() - 1);
+
+    for i in 0..SCHEME_IDS.len() {
+        let r = Rect::new(
+            s(38.) + i as i32 * (scheme_w + card_gap),
+            scheme_y,
+            scheme_w,
+            scheme_h,
+        );
+        draw_scheme_card(c, &mut hits, r, i, p.light, active_mode == i, hover, p.busy);
+    }
+
+    // 16-Color ANSI Palette Bar
+    let palette_y = s(370.);
+    let active_palette = crate::color_schemes::palette(SCHEME_IDS[active_mode], p.light)
+        .or_else(|| p.palette.clone());
+    if let Some(palette) = &active_palette {
+        let bar_w = w - s(76.);
+        let cell = bar_w / 16;
+        for (i, col) in palette.iter().enumerate() {
+            let cx = s(38.) + i as i32 * cell;
+            let cw = if i == 15 {
+                s(38.) + bar_w - cx
+            } else {
+                cell + 1
+            };
+            c.fill(Rect::new(cx, palette_y, cw, s(32.)), parse(col));
+        }
+        c.frame(Rect::new(s(38.), palette_y, bar_w, s(32.)), c.ui.border);
+    }
+
+    // =========================================================================
+    // Card 3: 테마 동기화 대상 프로그램 (16개 앱 원클릭 토글 + Windows 연동)
+    // =========================================================================
+    let sec3 = Rect::new(s(24.), s(422.), w - s(48.), s(118.));
+    c.round_rect(sec3, c.ui.surface, s(8.));
+
+    c.text(
+        "테마 동기화 대상 프로그램",
+        Rect::new(s(38.), s(430.), s(200.), s(24.)),
+        c.ui.accent,
+        12.5,
+        true,
+        0,
+    );
+    c.text(
+        "클릭하여 개별 앱 적용 여부를 선택하세요 (미설치 앱은 자동으로 건너뜁니다)",
+        Rect::new(s(230.), s(430.), s(420.), s(24.)),
+        c.ui.muted,
+        11.,
+        false,
+        0,
+    );
+
+    let all_targets = p.all_targets();
+    let all_on = all_targets.iter().all(|&b| b);
+
+    button(
+        c,
+        &mut hits,
         if p.windows {
-            "Windows · 켬"
+            "Windows 시스템 · 켬"
         } else {
-            "Windows · 끔"
+            "Windows 시스템 · 끔"
         },
-        Rect::new(s(360.), bottom_row1_y, s(110.), s(30.)),
+        Rect::new(w - s(278.), s(428.), s(126.), s(26.)),
         p.windows,
         Action::Windows,
         hover,
         p.busy,
     );
+    button(
+        c,
+        &mut hits,
+        if all_on {
+            "전체 선택 해제"
+        } else {
+            "전체 프로그램 선택"
+        },
+        Rect::new(w - s(146.), s(428.), s(110.), s(26.)),
+        false,
+        Action::SelectAllTargets(!all_on),
+        hover,
+        p.busy,
+    );
 
-    // Utility buttons & prominent Apply button
-    for (label, right, width, action) in [
-        ("테마 비교", 340., 100., Action::Compare),
-        ("테마 복원", 236., 96., Action::Restore),
-    ] {
-        button(
-            c,
-            &mut hits,
-            label,
-            Rect::new(w - s(right), bottom_row1_y, s(width), s(30.)),
-            false,
-            action,
-            hover,
-            p.busy,
+    let pill_grid_w = w - s(76.);
+    let pill_gap = s(6.);
+    let pill_w = (pill_grid_w - pill_gap * 7) / 8;
+    let pill_h = s(28.);
+    for (i, label) in APP_LABELS.iter().enumerate() {
+        let row = i / 8;
+        let col = i % 8;
+        let r = Rect::new(
+            s(38.) + col as i32 * (pill_w + pill_gap),
+            s(462.) + row as i32 * (pill_h + s(6.)),
+            pill_w,
+            pill_h,
         );
+        draw_app_pill(c, &mut hits, r, label, all_targets[i], i, hover, p.busy);
     }
 
-    // Prominent "적용" (Apply) button
-    let apply_rect = Rect::new(w - s(124.), bottom_row1_y - s(2.), s(106.), s(34.));
+    // =========================================================================
+    // Bottom Bar: 상태 안내 및 적용 버튼
+    // =========================================================================
+    let bottom_y = h - s(54.);
+    let mut footer = p.status.clone();
+    if footer.is_empty() {
+        footer = "마우스 휠 / ← → 키로 배경화면 탐색 · 스킴 및 대상 앱 선택 후 [적용 (Enter)] 클릭"
+            .into();
+    }
+    let memory: usize = p.images.values().map(|im| im.len()).sum();
+    let col = if memory >= 256 << 20 {
+        footer = format!(
+            "미리보기 메모리 {}MB · 이미지가 많습니다. 사용하지 않는 이미지를 정리해주세요.",
+            memory >> 20
+        );
+        c.ui.warning
+    } else if !p.status.is_empty() {
+        c.ui.accent
+    } else {
+        c.ui.muted
+    };
+    c.text(
+        &footer,
+        Rect::new(s(28.), bottom_y, w - s(400.), s(34.)),
+        col,
+        11.5,
+        !p.status.is_empty(),
+        0,
+    );
+
+    button(
+        c,
+        &mut hits,
+        "스타일 비교",
+        Rect::new(w - s(356.), bottom_y, s(96.), s(34.)),
+        false,
+        Action::Compare,
+        hover,
+        p.busy,
+    );
+    button(
+        c,
+        &mut hits,
+        "이전 테마 복원",
+        Rect::new(w - s(252.), bottom_y, s(104.), s(34.)),
+        false,
+        Action::Restore,
+        hover,
+        p.busy,
+    );
+
+    let apply_rect = Rect::new(w - s(140.), bottom_y, s(116.), s(34.));
     let apply_over = hover.is_some_and(|(x, y)| apply_rect.contains(x, y));
     let apply_bg = if apply_over {
-        crate::graphics::blend(c.ui.accent, 0xFFFFFF, 0.15)
+        blend(c.ui.accent, 0xFFFFFF, 0.15)
     } else {
         c.ui.accent
     };
@@ -638,70 +873,6 @@ pub fn paint(c: &mut Canvas, p: &Picker, hover: Option<(i32, i32)>, chrome: bool
             rect: apply_rect,
             action: Action::Apply,
         });
-    }
-
-    let mut footer = p.status.clone();
-    if footer.is_empty() {
-        footer = format!(
-            "휠 / ← → 선택   ·   Enter 적용   ·   Esc 닫기    {} / {}",
-            p.selected + 1,
-            p.files.len()
-        );
-        if p.loaded.len() < p.files.len() {
-            footer += &format!(" · 미리보기 {}/{}", p.loaded.len(), p.files.len());
-        }
-    }
-    let memory: usize = p.images.values().map(|im| im.len()).sum();
-    let col = if memory >= 256 << 20 {
-        footer = format!(
-            "미리보기 메모리 {}MB · 이미지가 많습니다. 사용하지 않는 이미지를 정리해주세요.",
-            memory >> 20
-        );
-        c.ui.warning
-    } else {
-        c.ui.muted
-    };
-    c.text(
-        &footer,
-        Rect::new(s(24.), h - s(43.), w - s(48.), s(24.)),
-        col,
-        12.,
-        false,
-        1,
-    );
-
-    // 정의된 컬러 스킴 메뉴: 항목 히트가 전체 화면 닫기 히트보다 앞선다.
-    if let Some(dropdown) = p.open_dropdown {
-        match dropdown {
-            Dropdown::Theme => {
-                let options: Vec<crate::views::DropdownOption> = SCHEME_IDS
-                    .iter()
-                    .enumerate()
-                    .map(|(index, id)| {
-                        let mut option =
-                            crate::views::DropdownOption::new(SCHEME_NAMES[index], p.mode == index);
-                        if let Some(palette) = crate::color_schemes::palette(id, p.light) {
-                            option = option.swatch(crate::graphics::parse(&palette[4]));
-                        }
-                        option
-                    })
-                    .collect();
-                let (items, dismiss) = crate::views::dropdown(c, theme_rect, &options, hover);
-                let mut dropdown_hits: Vec<Hit> = items
-                    .into_iter()
-                    .map(|(rect, index)| Hit {
-                        rect,
-                        action: Action::SetMode(index),
-                    })
-                    .collect();
-                dropdown_hits.push(Hit {
-                    rect: dismiss,
-                    action: Action::CloseDropdown,
-                });
-                dropdown_hits.append(&mut hits);
-                hits = dropdown_hits;
-            }
-        }
     }
 
     c.frame(Rect::new(0, 0, w, h), c.ui.border);

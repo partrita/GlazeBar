@@ -336,7 +336,7 @@ pub fn bar_with_settings(
                     Some(Action::Wifi),
                 );
             }
-            "tiling" => {
+            "tiling" if settings.show_tiling => {
                 let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));
                 c.icon(
                     if vertical {
@@ -354,7 +354,7 @@ pub fn bar_with_settings(
                 );
                 right = r.x - c.p(12.);
             }
-            "clock" => {
+            "clock" if settings.show_clock => {
                 let dw = c.measure(clock, 12.5, true);
                 let cr = Rect::new(right - dw - c.p(8.), 0, dw + c.p(8.), h);
                 c.text(clock, cr, ui.text, 12.5, true, 1);
@@ -525,6 +525,7 @@ impl DropdownOption {
             swatch: None,
         }
     }
+    #[allow(dead_code)]
     pub fn swatch(mut self, color: u32) -> Self {
         self.swatch = Some(color);
         self
