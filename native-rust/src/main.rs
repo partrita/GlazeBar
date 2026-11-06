@@ -6,6 +6,7 @@
     dangling_pointers_from_temporaries
 )]
 mod color_schemes;
+mod distribution_safety;
 mod go_sort;
 mod go_upper_table;
 mod graphics;

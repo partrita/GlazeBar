@@ -21,7 +21,7 @@ if command -v cargo >/dev/null 2>&1; then
     fi
 
     # 3. 로컬 단위 테스트 실행
-    echo "[3/3] 단위 테스트 검증..."
+    echo "[3/4] 단위 테스트 검증..."
     if [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win32" ]]; then
         if ! cargo test --locked; then
             echo "❌ 오류: cargo test 실패! CI 실패를 방지하기 위해 push가 중단됩니다."
@@ -29,6 +29,15 @@ if command -v cargo >/dev/null 2>&1; then
         fi
     else
         cargo test --locked --quiet 2>/dev/null || true
+    fi
+fi
+
+# 4. 배포 및 백신(AV) 안전성 회귀 검증
+echo "[4/4] 배포 및 백신 안전성 회귀 검증..."
+if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "$REPO_ROOT/distribution/Test-InstallerSafety.py"; then
+        echo "❌ 오류: 배포/백신 안전성 검증 실패!"
+        exit 1
     fi
 fi
 

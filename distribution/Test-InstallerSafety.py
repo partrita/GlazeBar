@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""
+Test-InstallerSafety.py
+Automated regression tests to prevent Antivirus (Windows Defender, AMSI) false positives
+and CodeQL static analysis security alerts.
+"""
+
+import sys
+import re
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+def test_cargo_release_profile():
+    print("[1/4] Checking Cargo release profile & linker flags...")
+    cargo_toml = (REPO_ROOT / "native-rust/Cargo.toml").read_text(encoding="utf-8")
+    
+    assert "strip = true" not in cargo_toml, (
+        "CRITICAL: Cargo.toml contains 'strip = true'. "
+        "Stripped Rust MSVC binaries trigger Windows Defender ML heuristics (Trojan:Win32/Wacatac.B!ml)."
+    )
+    assert "panic = \"abort\"" not in cargo_toml, (
+        "CRITICAL: Cargo.toml contains 'panic = \"abort\"'. "
+        "Missing unwind tables alter PE structure and trigger AV heuristics."
+    )
+    assert "opt-level = \"z\"" not in cargo_toml, (
+        "CRITICAL: Cargo.toml contains 'opt-level = \"z\"'. "
+        "Aggressive size optimization triggers packer/dropper detection."
+    )
+    assert 'opt-level = 3' in cargo_toml, "Cargo.toml should use safe 'opt-level = 3'."
+    
+    cargo_config = (REPO_ROOT / "native-rust/.cargo/config.toml").read_text(encoding="utf-8")
+    assert "/OPT:ICF" not in cargo_config, (
+        "CRITICAL: .cargo/config.toml contains '/OPT:ICF'. "
+        "Identical code folding changes PE section headers and triggers heuristic detection."
+    )
+    print("  ✓ Cargo release profile and linker configuration are AV-safe.")
+
+def test_installer_scripts():
+    print("[2/4] Checking installer scripts for AMSI & AV heuristic triggers...")
+    
+    # 1. Install.ps1
+    install_ps1 = (REPO_ROOT / "distribution/Install.ps1").read_text(encoding="utf-8")
+    assert "-ExecutionPolicy Bypass" not in install_ps1, (
+        "Install.ps1 must not use '-ExecutionPolicy Bypass' (known AV heuristic trigger)."
+    )
+    assert "Invoke-WebRequest" not in install_ps1 or "standalone-glazewm" not in install_ps1, (
+        "CRITICAL: Install.ps1 must NOT download GlazeWM MSI dynamically via Invoke-WebRequest. "
+        "Downloading an installer to %TEMP% and running it via Start-Process triggers AMSI dropper heuristics."
+    )
+    assert "$manifest.glazewmMsi" in install_ps1, (
+        "Install.ps1 must use local bundled $manifest.glazewmMsi."
+    )
+    
+    # 2. GlazeBar-Setup.iss
+    setup_iss = (REPO_ROOT / "distribution/GlazeBar-Setup.iss").read_text(encoding="utf-8")
+    assert "-ExecutionPolicy RemoteSigned" in setup_iss, (
+        "GlazeBar-Setup.iss must invoke PowerShell with '-ExecutionPolicy RemoteSigned'."
+    )
+    assert "-ExecutionPolicy Bypass" not in setup_iss, (
+        "GlazeBar-Setup.iss must not contain '-ExecutionPolicy Bypass'."
+    )
+    assert "LZMAUseSeparateProcess=yes" not in setup_iss, (
+        "GlazeBar-Setup.iss must not use 'LZMAUseSeparateProcess=yes'."
+    )
+    assert "LZMANumBlockThreads=1" not in setup_iss, (
+        "GlazeBar-Setup.iss must not restrict LZMA threads to 1."
+    )
+    
+    # 3. Setup-Bridge.ps1
+    bridge_ps1 = (REPO_ROOT / "distribution/Setup-Bridge.ps1").read_text(encoding="utf-8")
+    assert "-ExecutionPolicy Bypass" not in bridge_ps1, (
+        "Setup-Bridge.ps1 must not use '-ExecutionPolicy Bypass'."
+    )
+    print("  ✓ Installer scripts contain no dropper or execution policy triggers.")
+
+def test_bundle_repackaging():
+    print("[3/4] Checking bundle repackaging logic...")
+    repackage_py = (REPO_ROOT / "distribution/Repackage-Bundle.py").read_text(encoding="utf-8")
+    assert "shutil.rmtree(upstream_dir" not in repackage_py, (
+        "CRITICAL: Repackage-Bundle.py must NOT delete upstream_dir. "
+        "The official signed GlazeWM MSI must remain bundled so the installer works offline without downloading."
+    )
+    assert "manifest.pop('glazewmMsi'" not in repackage_py, (
+        "CRITICAL: Repackage-Bundle.py must NOT remove glazewmMsi from manifest."
+    )
+    print("  ✓ Bundle repackaging retains upstream signed MSI.")
+
+def test_codeql_safeguards():
+    print("[4/4] Checking CodeQL static analysis patterns...")
+    wifi_rs = (REPO_ROOT / "native-rust/src/wifi.rs").read_text(encoding="utf-8")
+    
+    assert 'profile(&n, "")' not in wifi_rs, (
+        "wifi.rs must not pass literal empty string '\"\"' to profile(...)."
+    )
+    assert 'codeql[rust/hard-coded-cryptographic-value]' in wifi_rs, (
+        "wifi.rs should include CodeQL exclusion comment for password validation test."
+    )
+    print("  ✓ CodeQL test patterns are properly constructed.")
+
+def main():
+    print("==================================================================")
+    print("  Running GlazeBar Installer & AV Safety Regression Tests")
+    print("==================================================================")
+    try:
+        test_cargo_release_profile()
+        test_installer_scripts()
+        test_bundle_repackaging()
+        test_codeql_safeguards()
+        print("==================================================================")
+        print("  ✓ ALL SAFETY AND REGRESSION CHECKS PASSED.")
+        print("==================================================================")
+        return 0
+    except AssertionError as e:
+        print(f"\n❌ REGRESSION FAILURE:\n{e}\n", file=sys.stderr)
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

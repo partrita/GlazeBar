@@ -9,6 +9,9 @@ if ($versionInfo.FileDescription -ne 'GlazeBar' -or $versionInfo.ProductName -ne
 $releaseManifest = Get-Content -LiteralPath (Join-Path $Bundle 'manifest.json') -Raw | ConvertFrom-Json
 if ($versionInfo.ProductVersion -ne $releaseManifest.version) { throw 'Executable version does not match bundle manifest' }
 if (Test-Path -LiteralPath (Join-Path $Bundle 'payload/WorkspaceToggle.exe')) { throw 'Legacy resident executable still shipped' }
+if (!$releaseManifest.glazewmMsi) { throw 'glazewmMsi missing from manifest.json' }
+$bundledMsi = Join-Path $Bundle $releaseManifest.glazewmMsi
+if (!(Test-Path -LiteralPath $bundledMsi)) { throw "Bundled upstream MSI not found: $($releaseManifest.glazewmMsi)" }
 $profile = Join-Path $env:TEMP ("GlazeBar bundle's 한글 " + [Guid]::NewGuid().ToString('N'))
 $target = Join-Path $profile '.glzr/glazewm'
 New-Item -ItemType Directory -Force $target | Out-Null
@@ -26,6 +29,9 @@ foreach ($file in Get-ChildItem -LiteralPath $Bundle -Filter '*.ps1') {
     $parseErrors = $null; $tokens = $null
     [void][Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count) { throw "PowerShell parse failed: $($file.Name)" }
+    $content = Get-Content -LiteralPath $file.FullName -Raw
+    if ($content -match '-ExecutionPolicy\s+Bypass') { throw "AV heuristic violation: $($file.Name) contains ExecutionPolicy Bypass" }
+    if ($content -match 'Invoke-WebRequest.*standalone-glazewm') { throw "AV heuristic violation: $($file.Name) contains dynamic MSI downloader pattern" }
 }
 # A modified installed config must be saved before original bytes are restored.
 [IO.File]::AppendAllText("$target/config.yaml", "`n# user edit after installation")
@@ -56,5 +62,5 @@ $failed = $false
 try { & "$Bundle/Install.ps1" -StageOnly -ProfileRoot $rollbackProfile } catch { $failed = $true }
 if (!$failed -or [IO.File]::ReadAllText("$rollbackTarget/config.yaml") -cne $original -or (Test-Path "$rollbackTarget/GlazeBar.exe") -or (Test-Path "$rollbackTarget/community-install.json")) { throw 'Partial installation rollback failed' }
 if ([IO.File]::ReadAllText("$rollbackTarget/icons") -cne 'existing file blocks directory creation') { throw 'Rollback changed unrelated file' }
-[ordered]@{ passed=$true; architecture=$manifest.architecture; isolatedProfile=$profile; checks=@('hash verification','path substitution with spaces and Unicode','backup and restore','preserve user edits','preserve unrelated files','remove new files','reject corruption','rollback partial install','script parsing') } | ConvertTo-Json | Set-Content (Join-Path $Bundle '..' "validation-$($manifest.architecture).json")
+[ordered]@{ passed=$true; architecture=$manifest.architecture; isolatedProfile=$profile; checks=@('hash verification','path substitution with spaces and Unicode','backup and restore','preserve user edits','preserve unrelated files','remove new files','reject corruption','rollback partial install','script parsing','antivirus heuristic safeguards') } | ConvertTo-Json | Set-Content (Join-Path $Bundle '..' "validation-$($manifest.architecture).json")
 Write-Output "Bundle tests passed ($($manifest.architecture)). Scratch files retained: $profile"

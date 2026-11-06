@@ -49,6 +49,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-${{ matrix.target }}-
 
+      - name: Verify Installer & AV Safety Safeguards
+        run: |
+          python3 distribution/Test-InstallerSafety.py
+
       - name: Run Tests
         working-directory: native-rust
         run: |

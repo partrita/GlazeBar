@@ -14,9 +14,18 @@ if command -v cargo >/dev/null 2>&1; then
     fi
 
     # 2. Cargo.lock 무결성 검증 (--locked)
-    echo "[2/2] Cargo.lock 무결성 검증..."
+    echo "[2/3] Cargo.lock 무결성 검증..."
     if ! cargo metadata --locked --format-version 1 > /dev/null 2>&1; then
         echo "❌ 오류: Cargo.lock이 최신 상태가 아니거나 무결성 검증에 실패했습니다."
+        exit 1
+    fi
+fi
+
+# 3. 배포 및 백신(AV) 안전성 회귀 검증
+echo "[3/3] 배포 및 백신 안전성 회귀 검증..."
+if command -v python3 >/dev/null 2>&1; then
+    if ! python3 "$REPO_ROOT/distribution/Test-InstallerSafety.py"; then
+        echo "❌ 오류: 배포/백신 안전성 검증 실패!"
         exit 1
     fi
 fi
