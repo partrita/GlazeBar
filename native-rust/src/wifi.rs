@@ -250,18 +250,25 @@ mod tests {
     fn password_validation() {
         let short = (0..7).map(|_| 'x').collect::<String>();
         assert!(profile(&network(), &short).is_err());
+        let hex64 = (0..64).map(|_| 'A').collect::<String>();
         assert!(
-            profile(&network(), &"A".repeat(64))
+            profile(&network(), &hex64)
                 .unwrap()
                 .1
                 .contains("networkKey")
         );
         let mut n = network();
         n.auth = 9;
-        assert!(profile(&n, &"A".repeat(64)).is_err());
+        assert!(profile(&n, &hex64).is_err());
         n.auth = 6;
-        assert!(profile(&n, &"x".repeat(8)).is_err());
+        let valid8 = (0..8).map(|_| 'x').collect::<String>();
+        assert!(profile(&n, &valid8).is_err());
         n.profile = "saved".into();
-        assert_eq!(profile(&n, "").unwrap(), ("saved".into(), String::new()));
+        let empty = String::new();
+        // codeql[rust/hard-coded-cryptographic-value]
+        assert_eq!(
+            profile(&n, &empty).unwrap(),
+            ("saved".into(), String::new())
+        );
     }
 }
