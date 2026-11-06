@@ -584,12 +584,10 @@ pub fn run_with_popup(
         if shadow_seconds.is_some_and(|seconds| start.elapsed().as_secs() >= seconds) {
             break;
         }
-        if !shadow && msg.message == WM_HOTKEY && !remote.load(Ordering::Relaxed) {
-            if let Some(command) = match msg.wParam {
-                2 => Some("Bar"),
-                3 => Some("Wallpaper"),
-                _ => None,
-            } {
+        if !shadow && msg.message == WM_HOTKEY {
+            if let Some(command) =
+                crate::hooks::hotkey_command(msg.wParam, remote.load(Ordering::Relaxed))
+            {
                 send(&tx, thread, Update::Control(command.into()));
             }
         }
@@ -757,7 +755,7 @@ pub fn run_with_popup(
                                     &root,
                                     scale,
                                     Scene::QuickTheme(crate::quick_theme_ui::QuickTheme::default()),
-                                    true,
+                                    false,
                                     &ntx,
                                 ),
                                 null_mut(),

@@ -40,8 +40,38 @@ mod tests {
             "CRITICAL: Linker flag /OPT:ICF alters PE section alignment, triggering heuristics."
         );
         assert!(
+            !cargo_config.contains("+crt-static"),
+            "CRITICAL: .cargo/config.toml must NOT use '+crt-static'. Dynamic CRT avoids Bitdefender Gen.Variant.Fugrafa false positives."
+        );
+        assert!(
             cargo_config.contains("/RELEASE"),
             "CRITICAL: .cargo/config.toml must specify '/RELEASE' linker flag to populate PE checksum."
+        );
+
+        let hooks_rs =
+            std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/hooks.rs"))
+                .expect("read src/hooks.rs");
+        for banned in [
+            "SetWindowsHookExW",
+            "UnhookWindowsHookEx",
+            "CallNextHookEx",
+            "WH_KEYBOARD_LL",
+            "WH_MOUSE_LL",
+            "keybd_event",
+            "GetAsyncKeyState",
+        ] {
+            assert!(
+                !hooks_rs.contains(banned),
+                "CRITICAL: hooks.rs must NOT use '{banned}' (triggers Bitdefender Gen.Variant.Fugrafa keylogger heuristic)."
+            );
+        }
+
+        let native_rs =
+            std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/native.rs"))
+                .expect("read src/native.rs");
+        assert!(
+            !native_rs.contains("GetAsyncKeyState"),
+            "CRITICAL: native.rs must use GetKeyState instead of GetAsyncKeyState."
         );
 
         let rc = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("glazebar.rc"))
@@ -115,6 +145,14 @@ mod tests {
         assert!(
             !repackage_py.contains("shutil.rmtree(upstream_dir"),
             "Repackage-Bundle.py must NOT delete upstream_dir. Upstream MSI must remain in the bundle to prevent runtime download heuristics."
+        );
+        assert!(
+            repackage_py.contains("normalize_lockfile"),
+            "Repackage-Bundle.py must normalize Cargo.lock version when comparing lockfiles."
+        );
+        assert!(
+            repackage_py.contains("(folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)"),
+            "Repackage-Bundle.py must remove the duplicate 5MB GlazeTheme.exe binary."
         );
     }
 

@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
+import shutil
 import struct
 import subprocess
 import zipfile
@@ -14,6 +16,15 @@ import zipfile
 
 def sha(data):
     return hashlib.sha256(data).hexdigest().upper()
+
+
+def normalize_lockfile(data: bytes) -> bytes:
+    text = data.replace(b'\r\n', b'\n')
+    return re.sub(
+        rb'(name = "glazebar-native"\nversion = )"[^"]+"',
+        rb'\1"0.0.0"',
+        text,
+    )
 
 
 def replace_modified_wm(args, folder, repo, arch):
@@ -88,27 +99,30 @@ def main():
         base.extractall(folder)
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=repo).decode().split('\0')[:-1]
     source = folder / 'source/glazebar-source.zip'
-    replacement = source.with_suffix('.new.zip')
-    with zipfile.ZipFile(source) as old, zipfile.ZipFile(replacement, 'w', zipfile.ZIP_DEFLATED, strict_timestamps=False) as new:
-        if old.read('native-rust/Cargo.lock').replace(b'\r\n', b'\n') != (repo / 'native-rust/Cargo.lock').read_bytes().replace(b'\r\n', b'\n'):
-            raise RuntimeError('Cannot reuse vendors with a different lockfile')
-        written = set()
-        for entry in old.infolist():
-            if entry.is_dir():
-                continue
-            name = entry.filename
-            local = repo / name
-            data = local.read_bytes() if name in tracked else old.read(name)
-            if name == 'native-rust/.cargo/config.toml':
-                data = local.read_bytes() + b"\n[source.crates-io]\nreplace-with = 'vendored-sources'\n[source.vendored-sources]\ndirectory = 'vendor'\n"
-            new.writestr(name, data)
-            written.add(name)
-        for name in tracked:
-            if name not in written:
-                new.write(repo / name, name)
-    replacement.replace(source)
-    for name in ['GlazeBar.exe', 'GlazeTheme.exe']:
-        (folder / 'payload' / name).write_bytes(binary)
+    if not args.slim and source.exists():
+        replacement = source.with_suffix('.new.zip')
+        with zipfile.ZipFile(source) as old, zipfile.ZipFile(replacement, 'w', zipfile.ZIP_DEFLATED, strict_timestamps=False) as new:
+            if normalize_lockfile(old.read('native-rust/Cargo.lock')) != normalize_lockfile((repo / 'native-rust/Cargo.lock').read_bytes()):
+                raise RuntimeError('Cannot reuse vendors with a different lockfile')
+            written = set()
+            for entry in old.infolist():
+                if entry.is_dir():
+                    continue
+                name = entry.filename
+                local = repo / name
+                data = local.read_bytes() if name in tracked else old.read(name)
+                if name == 'native-rust/.cargo/config.toml':
+                    data = local.read_bytes() + b"\n[source.crates-io]\nreplace-with = 'vendored-sources'\n[source.vendored-sources]\ndirectory = 'vendor'\n"
+                new.writestr(name, data)
+                written.add(name)
+            for name in tracked:
+                if name not in written:
+                    new.write(repo / name, name)
+        replacement.replace(source)
+    (folder / 'payload/GlazeBar.exe').write_bytes(binary)
+    (folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)
+    for name in ['config.yaml', 'cheatsheet.tsv']:
+        (folder / 'payload' / name).write_bytes((repo / 'distribution/templates' / name).read_bytes())
     for name in ['Install.ps1', 'Uninstall.ps1', 'README.txt', 'README.ko.txt']:
         (folder / name).write_bytes((repo / 'distribution' / name).read_bytes())
     unchanged = ['modified GlazeWM', 'official GlazeWM MSI', 'dependency vendors', 'third-party licenses']
@@ -132,6 +146,10 @@ def main():
                 item.unlink(missing_ok=True)
             for item in list(source_dir.glob('*.tar*')):
                 item.unlink(missing_ok=True)
+        for comp in ['glazebar', 'glazewm']:
+            comp_licenses = folder / 'licenses' / comp
+            if comp_licenses.exists():
+                shutil.rmtree(comp_licenses)
     manifest['version'] = args.version
     manifest['files'] = [{'path': p.relative_to(folder).as_posix(), 'sha256': sha(p.read_bytes())}
                          for p in sorted(folder.rglob('*')) if p.is_file() and p.name != 'manifest.json']

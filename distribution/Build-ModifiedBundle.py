@@ -60,8 +60,7 @@ def main():
     shutil.copytree(args.base, folder)
     for name in ['Install.ps1', 'Uninstall.ps1', 'README.txt', 'README.ko.txt']:
         shutil.copy2(repo / 'distribution' / name, folder / name)
-    for name in ['GlazeBar.exe', 'GlazeTheme.exe']:
-        shutil.copy2(args.bar, folder / 'payload' / name)
+    shutil.copy2(args.bar, folder / 'payload/GlazeBar.exe')
     for name in ['config.yaml', 'cheatsheet.tsv']:
         shutil.copy2(repo / 'distribution/templates' / name, folder / 'payload' / name)
     (folder / 'payload/wm').mkdir()

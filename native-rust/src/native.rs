@@ -752,7 +752,7 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 return 0;
             }
             WM_KEYDOWN => {
-                if wp == VK_TAB as usize && GetAsyncKeyState(VK_CONTROL as i32) < 0 {
+                if wp == VK_TAB as usize && GetKeyState(VK_CONTROL as i32) < 0 {
                     if let Scene::Hub(v) = &s.scene {
                         let next = if v.is_theme_tab() {
                             crate::hub::Tab::Settings
@@ -805,10 +805,10 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                         VK_RETURN if GetFocus() == GetDlgItem(h, 101) => {
                             Some(crate::online_ui::Edit::Search(true))
                         }
-                        VK_LEFT if GetAsyncKeyState(VK_CONTROL as i32) < 0 => {
+                        VK_LEFT if GetKeyState(VK_CONTROL as i32) < 0 => {
                             Some(crate::online_ui::Edit::Page(-1))
                         }
-                        VK_RIGHT if GetAsyncKeyState(VK_CONTROL as i32) < 0 => {
+                        VK_RIGHT if GetKeyState(VK_CONTROL as i32) < 0 => {
                             Some(crate::online_ui::Edit::Page(1))
                         }
                         VK_PRIOR if !editing => Some(crate::online_ui::Edit::Batch(-1)),
@@ -839,7 +839,7 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                             Action::Picker(crate::wallpaper_ui::Action::Apply),
                         ));
                     }
-                    if wp == 0x4f && GetAsyncKeyState(VK_CONTROL as i32) < 0 {
+                    if wp == 0x4f && GetKeyState(VK_CONTROL as i32) < 0 {
                         s.send(NativeEvent::Action(
                             h as usize,
                             Action::Picker(crate::wallpaper_ui::Action::Folder),
@@ -848,7 +848,7 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                     let delta = match wp as u16 {
                         VK_LEFT | 0x48 => Some(-1),
                         VK_RIGHT | 0x4c => Some(1),
-                        VK_TAB => Some(if GetAsyncKeyState(VK_SHIFT as i32) < 0 {
+                        VK_TAB => Some(if GetKeyState(VK_SHIFT as i32) < 0 {
                             -1
                         } else {
                             1

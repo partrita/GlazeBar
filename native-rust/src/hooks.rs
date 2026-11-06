@@ -2,7 +2,6 @@
 use anyhow::{Result, ensure};
 use std::{
     cell::RefCell,
-    collections::HashSet,
     ptr::null_mut,
     sync::{
         Arc,
@@ -12,82 +11,43 @@ use std::{
 };
 use windows_sys::Win32::{
     Foundation::*,
-    System::{LibraryLoader::GetModuleHandleW, Threading::*},
+    System::Threading::*,
     UI::{Accessibility::*, Input::KeyboardAndMouse::*, WindowsAndMessaging::*},
 };
 
-#[derive(Default, Clone, Copy)]
-struct Modifiers {
-    win: bool,
-    alt: bool,
-    ctrl: bool,
-    shift: bool,
-}
-#[derive(Default)]
-struct Keyboard {
-    swallowed: HashSet<u32>,
-    alt_tab: bool,
-}
-#[derive(Default, Debug, PartialEq)]
-struct Decision {
-    swallow: bool,
-    command: Option<&'static str>,
-    neutralize: bool,
-}
-impl Keyboard {
-    fn key(&mut self, vk: u32, down: bool, m: Modifiers, remote: bool) -> Decision {
-        if !down && self.swallowed.remove(&vk) {
-            return Decision {
-                swallow: true,
-                ..Default::default()
-            };
-        }
-        let mut command = None;
-        if remote {
-            self.alt_tab = false;
-        } else {
-            if down && vk == 9 && m.alt && !m.ctrl {
-                self.alt_tab = true;
-            }
-            if !down && matches!(vk, 0x12 | 0xa4 | 0xa5) && self.alt_tab {
-                self.alt_tab = false;
-                command = Some("FocusResync");
-            }
-        }
-        let win_m = vk == 0x4d && m.win && !m.alt && !m.ctrl && !m.shift;
-        let alt_m = !remote && vk == 0x4d && m.alt && !m.win && !m.ctrl && !m.shift;
-        let sheet = !remote && vk == 0x70 && m.win && !m.alt && !m.ctrl && !m.shift;
-        if down && (win_m || alt_m || sheet) {
-            let first = self.swallowed.insert(vk);
-            return Decision {
-                swallow: true,
-                neutralize: first,
-                command: if first && alt_m {
-                    Some("Toggle")
-                } else if first && sheet {
-                    Some("Sheet")
-                } else {
-                    None
-                },
-            };
-        }
-        Decision {
-            command,
-            ..Default::default()
-        }
-    }
-}
 pub enum Event {
     Control(&'static str),
     Foreground,
     PointerDown(POINT),
 }
+
+pub fn hotkey_command(id: usize, remote: bool) -> Option<&'static str> {
+    if remote {
+        return None;
+    }
+    match id {
+        2 => Some("Bar"),
+        3 => Some("Wallpaper"),
+        4 => Some("Toggle"),
+        5 => Some("Sheet"),
+        _ => None,
+    }
+}
+
+pub fn win_event_command(event: u32, remote: bool) -> Option<&'static str> {
+    if !remote && event == EVENT_SYSTEM_SWITCHEND {
+        Some("FocusResync")
+    } else {
+        None
+    }
+}
+
 struct Context {
     tx: Sender<Event>,
     thread: u32,
     remote: Arc<AtomicBool>,
-    keys: Keyboard,
     intercept: bool,
+    local_hotkeys: bool,
 }
 thread_local! { static CONTEXT: RefCell<Option<Context>> = const { RefCell::new(None) }; }
 impl Context {
@@ -98,51 +58,27 @@ impl Context {
             }
         }
     }
-}
-unsafe extern "system" fn keyboard(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    if code < 0 {
-        return unsafe { CallNextHookEx(null_mut(), code, wp, lp) };
-    }
-    let decision = CONTEXT.with(|slot| {
-        let mut slot = slot.borrow_mut();
-        let Some(c) = slot.as_mut().filter(|c| c.intercept) else {
-            return Decision::default();
-        };
-        let down = wp == WM_KEYDOWN as usize || wp == WM_SYSKEYDOWN as usize;
-        let pressed = |key| unsafe { GetAsyncKeyState(key) < 0 };
-        let m = Modifiers {
-            win: pressed(0x5b) || pressed(0x5c),
-            alt: pressed(0x12),
-            ctrl: pressed(0x11),
-            shift: pressed(0x10),
-        };
-        let d = c.keys.key(
-            unsafe { (*(lp as *const KBDLLHOOKSTRUCT)).vkCode },
-            down,
-            m,
-            c.remote.load(Ordering::Relaxed),
-        );
-        if let Some(cmd) = d.command {
-            c.emit(Event::Control(cmd));
+    fn sync_local_hotkeys(&mut self, is_remote: bool) {
+        if !self.intercept {
+            return;
         }
-        d
-    });
-    // Release the RefCell borrow before injecting, since hooks can reenter.
-    if decision.neutralize {
         unsafe {
-            keybd_event(0xe8, 0, 0, 0);
-            keybd_event(0xe8, 0, KEYEVENTF_KEYUP, 0);
+            if is_remote && self.local_hotkeys {
+                UnregisterHotKey(null_mut(), 4);
+                UnregisterHotKey(null_mut(), 5);
+                self.local_hotkeys = false;
+            } else if !is_remote && !self.local_hotkeys {
+                let _ = RegisterHotKey(null_mut(), 4, MOD_NOREPEAT | MOD_ALT, 0x4d);
+                let _ = RegisterHotKey(null_mut(), 5, MOD_NOREPEAT | MOD_WIN, 0x70);
+                self.local_hotkeys = true;
+            }
         }
     }
-    if decision.swallow {
-        1
-    } else {
-        unsafe { CallNextHookEx(null_mut(), code, wp, lp) }
-    }
 }
-unsafe extern "system" fn foreground(
+
+unsafe extern "system" fn win_event(
     _: HWINEVENTHOOK,
-    _: u32,
+    event: u32,
     hwnd: HWND,
     _: i32,
     _: i32,
@@ -150,29 +86,30 @@ unsafe extern "system" fn foreground(
     _: u32,
 ) {
     CONTEXT.with(|slot| {
-        if let Some(c) = slot.borrow().as_ref() {
-            c.remote.store(is_remote(hwnd), Ordering::Relaxed);
-            c.emit(Event::Foreground);
+        if let Some(c) = slot.borrow_mut().as_mut() {
+            match event {
+                EVENT_SYSTEM_FOREGROUND => {
+                    let now_remote = is_remote(hwnd);
+                    c.remote.store(now_remote, Ordering::Relaxed);
+                    c.sync_local_hotkeys(now_remote);
+                    c.emit(Event::Foreground);
+                }
+                EVENT_SYSTEM_CAPTURESTART => {
+                    let mut pt = POINT::default();
+                    if unsafe { GetCursorPos(&mut pt) } != 0 {
+                        c.emit(Event::PointerDown(pt));
+                    }
+                }
+                _ => {
+                    if let Some(cmd) = win_event_command(event, c.remote.load(Ordering::Relaxed)) {
+                        c.emit(Event::Control(cmd));
+                    }
+                }
+            }
         }
     });
 }
-unsafe extern "system" fn mouse(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    if code >= 0
-        && matches!(
-            wp as u32,
-            WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN
-        )
-    {
-        CONTEXT.with(|slot| {
-            if let Some(c) = slot.borrow().as_ref() {
-                c.emit(Event::PointerDown(unsafe {
-                    (*(lp as *const MSLLHOOKSTRUCT)).pt
-                }));
-            }
-        });
-    }
-    unsafe { CallNextHookEx(null_mut(), code, wp, lp) }
-}
+
 fn remote_name(path: &str) -> bool {
     matches!(
         path.rsplit(['\\', '/'])
@@ -199,8 +136,6 @@ fn is_remote(hwnd: HWND) -> bool {
     }
 }
 pub struct Hooks {
-    keyboard: HHOOK,
-    mouse: HHOOK,
     foreground: HWINEVENTHOOK,
     hotkeys: bool,
 }
@@ -211,49 +146,28 @@ impl Hooks {
             "Hooks already installed on this thread"
         );
         unsafe {
-            remote.store(is_remote(GetForegroundWindow()), Ordering::Relaxed);
+            let initial_remote = is_remote(GetForegroundWindow());
+            remote.store(initial_remote, Ordering::Relaxed);
             CONTEXT.with(|slot| {
-                *slot.borrow_mut() = Some(Context {
+                let mut ctx = Context {
                     tx,
                     thread: GetCurrentThreadId(),
                     remote,
-                    keys: Keyboard::default(),
                     intercept,
-                })
+                    local_hotkeys: false,
+                };
+                ctx.sync_local_hotkeys(initial_remote);
+                *slot.borrow_mut() = Some(ctx);
             });
             let mut hooks = Self {
-                keyboard: null_mut(),
-                mouse: null_mut(),
                 foreground: null_mut(),
                 hotkeys: intercept,
             };
-            hooks.keyboard = SetWindowsHookExW(
-                WH_KEYBOARD_LL,
-                Some(keyboard),
-                GetModuleHandleW(std::ptr::null()),
-                0,
-            );
-            ensure!(
-                !hooks.keyboard.is_null(),
-                "Cannot install keyboard hook: {}",
-                GetLastError()
-            );
-            hooks.mouse = SetWindowsHookExW(
-                WH_MOUSE_LL,
-                Some(mouse),
-                GetModuleHandleW(std::ptr::null()),
-                0,
-            );
-            ensure!(
-                !hooks.mouse.is_null(),
-                "Cannot install mouse hook: {}",
-                GetLastError()
-            );
             hooks.foreground = SetWinEventHook(
                 EVENT_SYSTEM_FOREGROUND,
-                EVENT_SYSTEM_FOREGROUND,
+                EVENT_SYSTEM_SWITCHEND,
                 null_mut(),
-                Some(foreground),
+                Some(win_event),
                 0,
                 0,
                 WINEVENT_OUTOFCONTEXT,
@@ -291,18 +205,14 @@ impl Hooks {
 impl Drop for Hooks {
     fn drop(&mut self) {
         unsafe {
-            if !self.keyboard.is_null() {
-                UnhookWindowsHookEx(self.keyboard);
-            }
-            if !self.mouse.is_null() {
-                UnhookWindowsHookEx(self.mouse);
-            }
             if !self.foreground.is_null() {
                 UnhookWinEvent(self.foreground);
             }
             if self.hotkeys {
                 UnregisterHotKey(null_mut(), 2);
                 UnregisterHotKey(null_mut(), 3);
+                UnregisterHotKey(null_mut(), 4);
+                UnregisterHotKey(null_mut(), 5);
             }
             CONTEXT.with(|slot| *slot.borrow_mut() = None);
         }
@@ -347,90 +257,28 @@ pub fn validate() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn repeated_keys_only_act_once_and_release_is_swallowed() {
-        let mut k = Keyboard::default();
-        let m = Modifiers {
-            alt: true,
-            ..Default::default()
-        };
-        assert_eq!(
-            k.key(0x4d, true, m, false),
-            Decision {
-                swallow: true,
-                command: Some("Toggle"),
-                neutralize: true
-            }
-        );
-        assert_eq!(
-            k.key(0x4d, true, m, false),
-            Decision {
-                swallow: true,
-                ..Default::default()
-            }
-        );
-        assert!(k.key(0x4d, false, Modifiers::default(), true).swallow);
-        assert!(!k.key(0x4d, false, m, false).swallow);
+    fn hotkeys_map_to_expected_commands_when_local() {
+        assert_eq!(hotkey_command(2, false), Some("Bar"));
+        assert_eq!(hotkey_command(3, false), Some("Wallpaper"));
+        assert_eq!(hotkey_command(4, false), Some("Toggle"));
+        assert_eq!(hotkey_command(5, false), Some("Sheet"));
+        assert_eq!(hotkey_command(99, false), None);
     }
     #[test]
-    fn remote_passes_local_shortcuts_but_preserves_win_m_rule() {
-        let mut k = Keyboard::default();
-        assert!(
-            !k.key(
-                0x4d,
-                true,
-                Modifiers {
-                    alt: true,
-                    ..Default::default()
-                },
-                true
-            )
-            .swallow
-        );
-        assert!(
-            !k.key(
-                0x70,
-                true,
-                Modifiers {
-                    win: true,
-                    ..Default::default()
-                },
-                true
-            )
-            .swallow
-        );
-        assert!(
-            k.key(
-                0x4d,
-                true,
-                Modifiers {
-                    win: true,
-                    ..Default::default()
-                },
-                true
-            )
-            .swallow
-        );
+    fn remote_blocks_local_hotkey_commands() {
+        assert_eq!(hotkey_command(2, true), None);
+        assert_eq!(hotkey_command(3, true), None);
+        assert_eq!(hotkey_command(4, true), None);
+        assert_eq!(hotkey_command(5, true), None);
     }
     #[test]
-    fn alt_tab_resyncs_once_on_alt_release() {
-        let mut k = Keyboard::default();
-        k.key(
-            9,
-            true,
-            Modifiers {
-                alt: true,
-                ..Default::default()
-            },
-            false,
-        );
+    fn switch_end_win_event_resyncs_only_when_local() {
         assert_eq!(
-            k.key(0xa4, false, Modifiers::default(), false).command,
+            win_event_command(EVENT_SYSTEM_SWITCHEND, false),
             Some("FocusResync")
         );
-        assert_eq!(
-            k.key(0xa4, false, Modifiers::default(), false).command,
-            None
-        );
+        assert_eq!(win_event_command(EVENT_SYSTEM_SWITCHEND, true), None);
+        assert_eq!(win_event_command(EVENT_SYSTEM_FOREGROUND, false), None);
     }
     #[test]
     fn only_undo_pause_owned_by_us() {

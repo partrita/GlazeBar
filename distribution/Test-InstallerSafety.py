@@ -42,8 +42,23 @@ def test_cargo_release_profile():
         "CRITICAL: .cargo/config.toml contains '/OPT:ICF'. "
         "Identical code folding changes PE section headers and triggers heuristic detection."
     )
+    assert "+crt-static" not in cargo_config, (
+        "CRITICAL: .cargo/config.toml contains '+crt-static'. "
+        "Static CRT combined with Win32 system APIs triggers Bitdefender Gen.Variant.Fugrafa false positives."
+    )
     assert "/RELEASE" in cargo_config, (
         "CRITICAL: .cargo/config.toml must specify '/RELEASE' linker flag to populate PE checksum."
+    )
+    
+    hooks_rs = (REPO_ROOT / "native-rust/src/hooks.rs").read_text(encoding="utf-8")
+    for banned_api in ["SetWindowsHookExW", "UnhookWindowsHookEx", "CallNextHookEx", "WH_KEYBOARD_LL", "WH_MOUSE_LL", "keybd_event", "GetAsyncKeyState"]:
+        assert banned_api not in hooks_rs, (
+            f"CRITICAL: hooks.rs contains '{banned_api}'. "
+            "Low-level global input hooks and keystroke injection trigger Bitdefender Gen.Variant.Fugrafa keylogger heuristics."
+        )
+    native_rs = (REPO_ROOT / "native-rust/src/native.rs").read_text(encoding="utf-8")
+    assert "GetAsyncKeyState" not in native_rs, (
+        "CRITICAL: native.rs must use GetKeyState instead of GetAsyncKeyState to avoid keylogger IAT heuristics."
     )
     
     rc_content = (REPO_ROOT / "native-rust/glazebar.rc").read_text(encoding="utf-8")
@@ -100,7 +115,20 @@ def test_bundle_repackaging():
     assert "manifest.pop('glazewmMsi'" not in repackage_py, (
         "CRITICAL: Repackage-Bundle.py must NOT remove glazewmMsi from manifest."
     )
-    print("  [OK] Bundle repackaging retains upstream signed MSI.")
+    assert "normalize_lockfile" in repackage_py, (
+        "CRITICAL: Repackage-Bundle.py must normalize Cargo.lock package version so version bumps do not abort slimming."
+    )
+    assert "(folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)" in repackage_py, (
+        "CRITICAL: Repackage-Bundle.py must remove the duplicate 5MB GlazeTheme.exe binary."
+    )
+    workflow_yml = (REPO_ROOT / ".github/workflows/package-installers.yml").read_text(encoding="utf-8")
+    assert "GlazeTheme.exe" not in workflow_yml, (
+        "package-installers.yml must not package redundant duplicate GlazeTheme.exe."
+    )
+    assert 'throw "Repackage-Bundle.py failed' in workflow_yml, (
+        "package-installers.yml must check $LASTEXITCODE and fail immediately if Repackage-Bundle.py fails."
+    )
+    print("  [OK] Bundle repackaging retains upstream signed MSI and enforces slimming.")
 
 def test_codeql_safeguards():
     print("[4/4] Checking CodeQL static analysis patterns...")

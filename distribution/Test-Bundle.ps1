@@ -9,6 +9,7 @@ if ($versionInfo.FileDescription -ne 'GlazeBar' -or $versionInfo.ProductName -ne
 $releaseManifest = Get-Content -LiteralPath (Join-Path $Bundle 'manifest.json') -Raw | ConvertFrom-Json
 if ($versionInfo.ProductVersion -ne $releaseManifest.version) { throw 'Executable version does not match bundle manifest' }
 if (Test-Path -LiteralPath (Join-Path $Bundle 'payload/WorkspaceToggle.exe')) { throw 'Legacy resident executable still shipped' }
+if (Test-Path -LiteralPath (Join-Path $Bundle 'payload/GlazeTheme.exe')) { throw 'Duplicate GlazeTheme.exe binary still shipped' }
 if (!$releaseManifest.glazewmMsi) { throw 'glazewmMsi missing from manifest.json' }
 $bundledMsi = Join-Path $Bundle $releaseManifest.glazewmMsi
 if (!(Test-Path -LiteralPath $bundledMsi)) { throw "Bundled upstream MSI not found: $($releaseManifest.glazewmMsi)" }

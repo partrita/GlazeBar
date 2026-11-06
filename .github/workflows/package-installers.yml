@@ -91,7 +91,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
           
           Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeBar.exe"
-          Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeTheme.exe"
           
           Compress-Archive -Path "$outDir/*" -DestinationPath "GlazeBar-windows-${{ matrix.arch }}.zip" -Force
 
@@ -177,45 +176,31 @@ jobs:
           # 2. Always repackage base bundle from upstream release with newly built GlazeBar
           Write-Host "Repackaging base bundle from upstream release (v0.1.0-preview.7) with newly built GlazeBar..."
           New-Item -ItemType Directory -Force -Path upstream-base | Out-Null
-          try {
-            gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
-            if ($LASTEXITCODE -eq 0 -and (Test-Path upstream-base)) {
-              $repackageSuccess = $true
-              foreach ($arch in 'x64', 'arm64') {
-                $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
-                $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
-                  if ($arch -eq 'x64') { $_.FullName -like "*windows-x64*" } else { $_.FullName -like "*windows-arm64*" }
-                } | Select-Object -First 1
-
-                if ($baseZip -and $barExe) {
-                  Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName) (Slim)..."
-                  python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version --slim
-                  $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
-                  if (!(Test-Path "$expectedDir/manifest.json")) {
-                    Write-Warning "Repackaged bundle missing manifest: $expectedDir"
-                    $repackageSuccess = $false
-                  }
-                } else {
-                  Write-Warning "Missing baseZip or barExe for $arch (baseZip: $($baseZip?.Name), barExe: $($barExe?.FullName))"
-                  $repackageSuccess = $false
-                }
-              }
-              $hasBundles = $repackageSuccess
-            }
-          } catch {
-            Write-Warning "Repackage base bundle failed: $_"
-            $hasBundles = $false
+          gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path upstream-base)) {
+            throw "Failed to download upstream base bundle from lamininA1/GlazeBar v0.1.0-preview.7"
           }
-
-          # Verify both bundle folders exist and contain manifest.json before proceeding to installer build
-          $bundlesVerified = $true
           foreach ($arch in 'x64', 'arm64') {
-            $checkDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
-            if (!(Test-Path "$checkDir/manifest.json")) {
-              $bundlesVerified = $false
+            $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
+            $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
+              if ($arch -eq 'x64') { $_.FullName -like "*windows-x64*" } else { $_.FullName -like "*windows-arm64*" }
+            } | Select-Object -First 1
+
+            if ($baseZip -and $barExe) {
+              Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName) (Slim)..."
+              python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version --slim
+              if ($LASTEXITCODE -ne 0) {
+                throw "Repackage-Bundle.py failed for $arch with exit code $LASTEXITCODE"
+              }
+              $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+              if (!(Test-Path "$expectedDir/manifest.json")) {
+                throw "Repackaged bundle missing manifest: $expectedDir"
+              }
+            } else {
+              throw "Missing baseZip or barExe for $arch (baseZip: $($baseZip?.Name), barExe: $($barExe?.FullName))"
             }
           }
-          $hasBundles = $bundlesVerified
+          $hasBundles = $true
 
           # 3. If bundles are available, validate and compile Inno Setup installers
           if ($hasBundles) {

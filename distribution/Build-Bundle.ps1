@@ -160,7 +160,6 @@ foreach ($arch in @('arm64','x64')) {
     Copy-Item -LiteralPath $common -Destination $folder -Recurse
     New-Item -ItemType Directory -Force "$folder/payload", "$folder/upstream" | Out-Null
     Copy-Item -LiteralPath $exe -Destination "$folder/payload/GlazeBar.exe"
-    Copy-Item -LiteralPath $exe -Destination "$folder/payload/GlazeTheme.exe"
     Copy-Item -LiteralPath (Join-Path $repo 'icons') -Destination "$folder/payload/icons" -Recurse
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'templates/config.yaml'),(Join-Path $PSScriptRoot 'templates/cheatsheet.tsv') -Destination "$folder/payload"
     $msi = "standalone-glazewm-v3.10.1-$arch.msi"
