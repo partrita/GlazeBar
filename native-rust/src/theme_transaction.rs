@@ -210,13 +210,13 @@ impl Plan {
         };
         if wanted("glazebar") {
             let config = home.join(".glzr/glazewm/config.yaml");
-            if let Some(data) = read(&config)? {
-                if let Ok(updated) = theme_text::focused_border(
+            if let Some(data) = read(&config)?
+                && let Ok(updated) = theme_text::focused_border(
                     std::str::from_utf8(&data)?,
                     &theme::accent(&p, r.light),
-                ) {
-                    plan.add(config, updated.into_bytes())?;
-                }
+                )
+            {
+                plan.add(config, updated.into_bytes())?;
             }
             plan.add(
                 plan.state.join("glazebar.json"),
@@ -231,11 +231,11 @@ impl Plan {
             } else {
                 let mut count = 0;
                 for path in paths {
-                    if let Ok(source) = text(&path) {
-                        if let Ok(updated) = theme_settings::terminal_settings(&source, &p) {
-                            plan.add(path, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    if let Ok(source) = text(&path)
+                        && let Ok(updated) = theme_settings::terminal_settings(&source, &p)
+                    {
+                        plan.add(path, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
                 if count > 0 {
@@ -313,15 +313,15 @@ impl Plan {
                 let mut count = 0;
                 for dir in dirs {
                     let settings_path = dir.join("settings.json");
-                    if let Ok(source) = text(&settings_path) {
-                        if let Ok(updated) = theme_settings::zed_settings(&source, &p, r.light) {
-                            plan.add(
-                                dir.join("themes/glazebar-aether.json"),
-                                json(&theme::zed_theme(&p, r.light))?,
-                            )?;
-                            plan.add(settings_path, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    if let Ok(source) = text(&settings_path)
+                        && let Ok(updated) = theme_settings::zed_settings(&source, &p, r.light)
+                    {
+                        plan.add(
+                            dir.join("themes/glazebar-aether.json"),
+                            json(&theme::zed_theme(&p, r.light))?,
+                        )?;
+                        plan.add(settings_path, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
                 if count > 0 {
@@ -362,20 +362,19 @@ impl Plan {
                 let mut count = 0;
                 if dir.is_dir() {
                     let settings_path = dir.join("settings.json");
-                    if let Ok(source) = text(&settings_path) {
-                        if let Ok(updated) = theme_settings::claude_settings(&source, r.light) {
-                            plan.add(settings_path, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    if let Ok(source) = text(&settings_path)
+                        && let Ok(updated) = theme_settings::claude_settings(&source, r.light)
+                    {
+                        plan.add(settings_path, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
-                if dotfile.is_file() {
-                    if let Ok(source) = text(&dotfile) {
-                        if let Ok(updated) = theme_settings::claude_settings(&source, r.light) {
-                            plan.add(dotfile, updated.into_bytes())?;
-                            count += 1;
-                        }
-                    }
+                if dotfile.is_file()
+                    && let Ok(source) = text(&dotfile)
+                    && let Ok(updated) = theme_settings::claude_settings(&source, r.light)
+                {
+                    plan.add(dotfile, updated.into_bytes())?;
+                    count += 1;
                 }
                 if count > 0 {
                     plan.applied.push("claude".into());
@@ -392,17 +391,16 @@ impl Plan {
                 let mut count = 0;
                 for dir in dirs {
                     let config_path = dir.join("opencode.json");
-                    if let Ok(source) = text(&config_path) {
-                        if let Ok(updated) =
+                    if let Ok(source) = text(&config_path)
+                        && let Ok(updated) =
                             theme_settings::opencode_settings(&source, "glazebar-aether")
-                        {
-                            plan.add(
-                                dir.join("themes/glazebar-aether.json"),
-                                json(&theme::opencode_theme(&p, r.light))?,
-                            )?;
-                            plan.add(config_path, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    {
+                        plan.add(
+                            dir.join("themes/glazebar-aether.json"),
+                            json(&theme::opencode_theme(&p, r.light))?,
+                        )?;
+                        plan.add(config_path, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
                 if count > 0 {
@@ -441,13 +439,12 @@ impl Plan {
             } else {
                 let mut count = 0;
                 for pref in prefs {
-                    if let Ok(source) = text(&pref) {
-                        if let Ok(updated) =
+                    if let Ok(source) = text(&pref)
+                        && let Ok(updated) =
                             theme_settings::chromium_preferences(&source, &p, r.light)
-                        {
-                            plan.add(pref, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    {
+                        plan.add(pref, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
                 if count > 0 {
@@ -464,13 +461,12 @@ impl Plan {
             } else {
                 let mut count = 0;
                 for pref in prefs {
-                    if let Ok(source) = text(&pref) {
-                        if let Ok(updated) =
+                    if let Ok(source) = text(&pref)
+                        && let Ok(updated) =
                             theme_settings::chromium_preferences(&source, &p, r.light)
-                        {
-                            plan.add(pref, updated.into_bytes())?;
-                            count += 1;
-                        }
+                    {
+                        plan.add(pref, updated.into_bytes())?;
+                        count += 1;
                     }
                 }
                 if count > 0 {
@@ -971,20 +967,18 @@ fn pwsh_profile_paths(home: &Path) -> Vec<PathBuf> {
         ".config/powershell/Microsoft.PowerShell_profile.ps1",
     ] {
         let p = home.join(rel);
-        if p.is_file() || p.parent().is_some_and(|d| d.is_dir()) {
-            if !paths.contains(&p) {
-                paths.push(p);
-            }
+        if (p.is_file() || p.parent().is_some_and(|d| d.is_dir())) && !paths.contains(&p) {
+            paths.push(p);
         }
     }
     paths
 }
 fn starship_config_paths(home: &Path) -> Vec<PathBuf> {
     let mut paths = vec![];
-    if let Some(custom) = std::env::var_os("STARSHIP_CONFIG").map(PathBuf::from) {
-        if custom.is_file() || custom.parent().is_some_and(|d| d.is_dir()) {
-            paths.push(custom);
-        }
+    if let Some(custom) = std::env::var_os("STARSHIP_CONFIG").map(PathBuf::from)
+        && (custom.is_file() || custom.parent().is_some_and(|d| d.is_dir()))
+    {
+        paths.push(custom);
     }
     let p = home.join(".config/starship.toml");
     if (p.is_file() || home.join(".config").is_dir()) && !paths.contains(&p) {
@@ -996,10 +990,10 @@ fn mintty_config_paths(home: &Path) -> Vec<PathBuf> {
     let mut paths = vec![];
     for rel in [".minttyrc", "AppData/Roaming/mintty/config"] {
         let p = home.join(rel);
-        if p.is_file() || (rel == ".minttyrc" && home.join("AppData/Local/Programs/Git").is_dir()) {
-            if !paths.contains(&p) {
-                paths.push(p);
-            }
+        if (p.is_file() || (rel == ".minttyrc" && home.join("AppData/Local/Programs/Git").is_dir()))
+            && !paths.contains(&p)
+        {
+            paths.push(p);
         }
     }
     paths

@@ -215,6 +215,11 @@ pub fn connect(n: &Network, password: &str, cancel: &AtomicBool) -> Result<()> {
     }
     anyhow::bail!("연결을 확인하지 못했습니다. 비밀번호와 신호를 확인해 주세요")
 }
+
+fn guid_key(g: GUID) -> (u32, u16, u16, [u8; 8]) {
+    (g.data1, g.data2, g.data3, g.data4)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,13 +262,6 @@ mod tests {
         n.auth = 6;
         assert!(profile(&n, &"x".repeat(8)).is_err());
         n.profile = "saved".into();
-        assert_eq!(
-            profile(&n, &String::new()).unwrap(),
-            ("saved".into(), String::new())
-        );
+        assert_eq!(profile(&n, "").unwrap(), ("saved".into(), String::new()));
     }
-}
-
-fn guid_key(g: GUID) -> (u32, u16, u16, [u8; 8]) {
-    (g.data1, g.data2, g.data3, g.data4)
 }

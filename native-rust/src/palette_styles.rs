@@ -3,33 +3,7 @@ use crate::{
     theme::{self, Palette},
 };
 use anyhow::Result;
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn styles_match_go() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            colors: Vec<String>,
-            weights: Option<Vec<f64>>,
-            light: bool,
-            mode: String,
-            expected: Palette,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../fixtures/styles-go.json")).unwrap();
-        assert_eq!(cases.len(), 792);
-        for (i, c) in cases.into_iter().enumerate() {
-            assert_eq!(
-                crate::palette_mono::generate(&c.colors, c.weights.as_deref(), c.light, &c.mode)
-                    .unwrap(),
-                c.expected,
-                "style case {i}, {}",
-                c.mode
-            );
-        }
-    }
-}
+
 fn to_hsl(color: &str) -> [f64; 3] {
     let [r, g, b] = theme::rgb(color).map(|c| c / 255.);
     let max = r.max(g.max(b));
@@ -130,76 +104,79 @@ fn material(colors: &[String], light: bool) -> Palette {
     p[15] = if light { "#000000" } else { "#ffffff" }.into();
     p
 }
+
+struct StyleParams {
+    bg: [[f64; 2]; 2],
+    fg: [[f64; 2]; 2],
+    ansi_l: [f64; 2],
+    cmin: [f64; 2],
+    cmax: [f64; 2],
+    factor: f64,
+    offset: [f64; 6],
+}
+
 pub fn generate(colors: &[String], light: bool, mode: &str) -> Result<Palette> {
     if mode == "material" {
         return Ok(material(colors, light));
     }
     // [dark, light] bg/fg L,C; accent L and chroma bounds/factor; per-slot L offsets.
-    let (bg, fg, ansi_l, cmin, cmax, factor, offset): (
-        [[f64; 2]; 2],
-        [[f64; 2]; 2],
-        [f64; 2],
-        [f64; 2],
-        [f64; 2],
-        f64,
-        [f64; 6],
-    ) = match mode {
-        "pastel" => (
-            [[0.20, 0.022], [0.96, 0.012]],
-            [[0.85, 0.04], [0.32, 0.05]],
-            [0.78, 0.55],
-            [0.05, 0.045],
-            [0.075, 0.07],
-            1.,
-            [-0.04, 0.02, 0.05, -0.03, -0.01, 0.03],
-        ),
-        "colorful" => (
-            [[0.10, 0.022], [0.97, 0.012]],
-            [[0.92, 0.03], [0.18, 0.04]],
-            [0.65, 0.50],
-            [0.14, 0.14],
-            [0.20, 0.20],
-            1.,
-            [-0.05, 0.02, 0.06, -0.03, -0.02, 0.04],
-        ),
-        "muted" => (
-            [[0.16, 0.018], [0.94, 0.010]],
-            [[0.84, 0.035], [0.28, 0.045]],
-            [0.62, 0.48],
-            [0.035, 0.035],
-            [0.065, 0.065],
-            0.5,
-            [-0.10, -0.04, 0.04, 0.10, -0.07, 0.07],
-        ),
-        "bright" => (
-            [[0.10, 0.020], [0.98, 0.010]],
-            [[0.92, 0.025], [0.15, 0.04]],
-            [0.78, 0.42],
-            [0.10, 0.10],
-            [0.18, 0.18],
-            1.,
-            [-0.04, 0.01, 0.06, -0.03, -0.02, 0.03],
-        ),
-        "high-contrast" => (
-            [[0.05, 0.010], [0.99, 0.005]],
-            [[0.95, 0.015], [0.10, 0.020]],
-            [0.82, 0.32],
-            [0.10, 0.10],
-            [0.18, 0.18],
-            1.,
-            [-0.03, 0.01, 0.04, -0.02, -0.01, 0.02],
-        ),
+    let params = match mode {
+        "pastel" => StyleParams {
+            bg: [[0.20, 0.022], [0.96, 0.012]],
+            fg: [[0.85, 0.04], [0.32, 0.05]],
+            ansi_l: [0.78, 0.55],
+            cmin: [0.05, 0.045],
+            cmax: [0.075, 0.07],
+            factor: 1.,
+            offset: [-0.04, 0.02, 0.05, -0.03, -0.01, 0.03],
+        },
+        "colorful" => StyleParams {
+            bg: [[0.10, 0.022], [0.97, 0.012]],
+            fg: [[0.92, 0.03], [0.18, 0.04]],
+            ansi_l: [0.65, 0.50],
+            cmin: [0.14, 0.14],
+            cmax: [0.20, 0.20],
+            factor: 1.,
+            offset: [-0.05, 0.02, 0.06, -0.03, -0.02, 0.04],
+        },
+        "muted" => StyleParams {
+            bg: [[0.16, 0.018], [0.94, 0.010]],
+            fg: [[0.84, 0.035], [0.28, 0.045]],
+            ansi_l: [0.62, 0.48],
+            cmin: [0.035, 0.035],
+            cmax: [0.065, 0.065],
+            factor: 0.5,
+            offset: [-0.10, -0.04, 0.04, 0.10, -0.07, 0.07],
+        },
+        "bright" => StyleParams {
+            bg: [[0.10, 0.020], [0.98, 0.010]],
+            fg: [[0.92, 0.025], [0.15, 0.04]],
+            ansi_l: [0.78, 0.42],
+            cmin: [0.10, 0.10],
+            cmax: [0.18, 0.18],
+            factor: 1.,
+            offset: [-0.04, 0.01, 0.06, -0.03, -0.02, 0.03],
+        },
+        "high-contrast" => StyleParams {
+            bg: [[0.05, 0.010], [0.99, 0.005]],
+            fg: [[0.95, 0.015], [0.10, 0.020]],
+            ansi_l: [0.82, 0.32],
+            cmin: [0.10, 0.10],
+            cmax: [0.18, 0.18],
+            factor: 1.,
+            offset: [-0.03, 0.01, 0.04, -0.02, -0.01, 0.02],
+        },
         _ => return crate::palette_extra::generate(colors, light, mode),
     };
     let mut p = base::extract_hues(colors, None, light);
     let m = light as usize;
-    p[0] = base::hex([bg[m][0], bg[m][1], theme::to_oklch(&p[0])[2]]);
-    p[7] = base::hex([fg[m][0], fg[m][1], theme::to_oklch(&p[7])[2]]);
+    p[0] = base::hex([params.bg[m][0], params.bg[m][1], theme::to_oklch(&p[0])[2]]);
+    p[7] = base::hex([params.fg[m][0], params.fg[m][1], theme::to_oklch(&p[7])[2]]);
     for i in 0..6 {
         let [_, c, h] = theme::to_oklch(&p[i + 1]);
         p[i + 1] = base::hex([
-            (ansi_l[m] + offset[i]).clamp(0.05, 0.95),
-            (c * factor).clamp(cmin[m], cmax[m]),
+            (params.ansi_l[m] + params.offset[i]).clamp(0.05, 0.95),
+            (c * params.factor).clamp(params.cmin[m], params.cmax[m]),
             h,
         ]);
     }
@@ -213,4 +190,32 @@ pub fn generate(colors: &[String], light: bool, mode: &str) -> Result<Palette> {
         }
     }
     Ok(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn styles_match_go() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            colors: Vec<String>,
+            weights: Option<Vec<f64>>,
+            light: bool,
+            mode: String,
+            expected: Palette,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../fixtures/styles-go.json")).unwrap();
+        assert_eq!(cases.len(), 792);
+        for (i, c) in cases.into_iter().enumerate() {
+            assert_eq!(
+                crate::palette_mono::generate(&c.colors, c.weights.as_deref(), c.light, &c.mode)
+                    .unwrap(),
+                c.expected,
+                "style case {i}, {}",
+                c.mode
+            );
+        }
+    }
 }

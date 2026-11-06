@@ -21,6 +21,7 @@ use windows_sys::Win32::{
 };
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Scene {
     Bar {
         monitor: Monitor,
@@ -1345,7 +1346,7 @@ pub fn validate(root: PathBuf) -> anyhow::Result<()> {
             "Online query text roundtrip failed"
         );
         anyhow::ensure!(
-            GetWindowLongW(edit, GWL_STYLE) & ES_PASSWORD as i32 == 0,
+            GetWindowLongW(edit, GWL_STYLE) & ES_PASSWORD == 0,
             "Online query is masked"
         );
         let dc = GetDC(handle);

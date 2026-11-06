@@ -330,7 +330,7 @@ impl Canvas<'_> {
         if !self.resources.blended_icons.contains_key(&blend_key) {
             let pixels = &self.resources.icons[&key];
             let mut data = Vec::with_capacity(pixels.data().len());
-            for p in pixels.data().chunks_exact(4) {
+            for p in pixels.data().as_chunks::<4>().0 {
                 let a = p[3] as u32;
                 for (channel, shift) in [(2, 16), (1, 8), (0, 0)] {
                     data.push(
@@ -347,13 +347,15 @@ impl Canvas<'_> {
     }
     pub fn bitmap(&self, r: Rect, w: i32, h: i32, bgra: &[u8]) {
         let r = self.at(r);
-        let mut info = BITMAPINFO::default();
-        info.bmiHeader = BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: w,
-            biHeight: -h,
-            biPlanes: 1,
-            biBitCount: 32,
+        let info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                biHeight: -h,
+                biPlanes: 1,
+                biBitCount: 32,
+                ..Default::default()
+            },
             ..Default::default()
         };
         unsafe {
@@ -405,13 +407,15 @@ pub fn render_png(
             paint(&mut c);
         }
         SelectObject(mem, old);
-        let mut info = BITMAPINFO::default();
-        info.bmiHeader = BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: width,
-            biHeight: -height,
-            biPlanes: 1,
-            biBitCount: 32,
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height,
+                biPlanes: 1,
+                biBitCount: 32,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let mut pixels = vec![0u8; (width * height * 4) as usize];
@@ -428,7 +432,7 @@ pub fn render_png(
         DeleteDC(mem);
         ReleaseDC(std::ptr::null_mut(), dc);
         anyhow::ensure!(ok != 0, "GetDIBits failed");
-        for p in pixels.chunks_exact_mut(4) {
+        for p in pixels.as_chunks_mut::<4>().0 {
             p.swap(0, 2);
             p[3] = 255;
         }

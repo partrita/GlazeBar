@@ -5,30 +5,7 @@ use crate::{
 };
 use anyhow::{Result, ensure};
 pub const HUES: [f64; 6] = [29.2, 139.1, 111.3, 266.7, 326.4, 194.8];
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn chromatic_palettes_match_go() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            colors: Vec<String>,
-            weights: Option<Vec<f64>>,
-            light: bool,
-            expected: Palette,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../fixtures/chromatic-go.json")).unwrap();
-        assert_eq!(cases.len(), 132);
-        for (i, c) in cases.into_iter().enumerate() {
-            assert_eq!(
-                chromatic(&c.colors, c.weights.as_deref(), c.light).unwrap(),
-                c.expected,
-                "chromatic case {i}"
-            );
-        }
-    }
-}
+
 pub fn hex(lch: [f64; 3]) -> String {
     let [r, g, b] = theme::from_oklch(lch);
     format!("#{r:02x}{g:02x}{b:02x}")
@@ -89,10 +66,10 @@ pub fn foreground(
         .filter(|(_, c)| *c > contrast)
         .collect();
     go_sort::sort(&mut candidates, |a, b| a.1 > b.1);
-    if let Some(&(i, c)) = candidates.first() {
-        if c >= 4.5 {
-            return (colors[i].clone(), Some(i));
-        }
+    if let Some(&(i, c)) = candidates.first()
+        && c >= 4.5
+    {
+        return (colors[i].clone(), Some(i));
     }
     let mut lab = theme::to_oklab(fg);
     lab[0] = if theme::to_oklab(bg)[0] < 0.5 {
@@ -202,7 +179,7 @@ pub fn bright(color: &str) -> String {
     if l >= 0.78 {
         return hex([(l + 0.04).min(0.94), (c + 0.04).max(c * 1.3).min(0.32), h]);
     }
-    let boost = ((0.92 - l) * 0.6).min(0.12).max(0.04);
+    let boost = ((0.92 - l) * 0.6).clamp(0.04, 0.12);
     hex([(l + boost).min(0.92), (c * 1.1).min(0.30), h])
 }
 pub fn boost(color: &str, bg: &str, ratio: f64) -> String {
@@ -336,4 +313,29 @@ fn chromatic_validated(colors: &[String], weights: Option<&[f64]>, light: bool) 
     }
     finalize(&mut p);
     p
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn chromatic_palettes_match_go() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            colors: Vec<String>,
+            weights: Option<Vec<f64>>,
+            light: bool,
+            expected: Palette,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../fixtures/chromatic-go.json")).unwrap();
+        assert_eq!(cases.len(), 132);
+        for (i, c) in cases.into_iter().enumerate() {
+            assert_eq!(
+                chromatic(&c.colors, c.weights.as_deref(), c.light).unwrap(),
+                c.expected,
+                "chromatic case {i}"
+            );
+        }
+    }
 }

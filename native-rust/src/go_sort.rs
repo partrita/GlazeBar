@@ -1,23 +1,5 @@
 // Adapted from Go sort/zsortfunc.go (Copyright 2022 The Go Authors).
 // BSD license: ../licenses/GO-LICENSE.txt. Preserve tie order for extraction parity.
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn exact_go_tie_order() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            input: Vec<[i32; 2]>,
-            expected: Vec<[i32; 2]>,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../fixtures/sort-go.json")).unwrap();
-        assert_eq!(cases.len(), 45);
-        for (index, mut case) in cases.into_iter().enumerate() {
-            super::sort(&mut case.input, |a, b| a[0] < b[0]);
-            assert_eq!(case.input, case.expected, "sort case {index}");
-        }
-    }
-}
 pub fn sort<T>(v: &mut [T], less: impl Fn(&T, &T) -> bool) {
     fn insertion<T>(v: &mut [T], a: usize, b: usize, f: &impl Fn(&T, &T) -> bool) {
         for i in a + 1..b {
@@ -218,4 +200,23 @@ pub fn sort<T>(v: &mut [T], less: impl Fn(&T, &T) -> bool) {
         }
     }
     pdq(v, 0, v.len(), usize::BITS - v.len().leading_zeros(), &less)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn exact_go_tie_order() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            input: Vec<[i32; 2]>,
+            expected: Vec<[i32; 2]>,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../fixtures/sort-go.json")).unwrap();
+        assert_eq!(cases.len(), 45);
+        for (index, mut case) in cases.into_iter().enumerate() {
+            super::sort(&mut case.input, |a, b| a[0] < b[0]);
+            assert_eq!(case.input, case.expected, "sort case {index}");
+        }
+    }
 }

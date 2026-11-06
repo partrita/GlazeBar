@@ -27,10 +27,10 @@ fn identity_at(path: &str, size: u64, ticks: u128) -> String {
         .map(|ch| {
             let code = ch as u32;
             let index = crate::go_upper_table::UPPER.partition_point(|&(_, end, _)| end < code);
-            if let Some(&(start, _, delta)) = crate::go_upper_table::UPPER.get(index) {
-                if code >= start {
-                    return char::from_u32((i64::from(code) + i64::from(delta)) as u32).unwrap();
-                }
+            if let Some(&(start, _, delta)) = crate::go_upper_table::UPPER.get(index)
+                && code >= start
+            {
+                return char::from_u32((i64::from(code) + i64::from(delta)) as u32).unwrap();
             }
             ch
         })
@@ -118,14 +118,14 @@ pub fn extract_modes(
             engine_dir,
         )?;
         for ((index, mode), p) in missing.into_iter().zip(generated) {
-            if keys[index] == palette_key(path, mode, light) {
-                if let Some((dir, key)) = ui_dir.zip(keys[index].as_deref()) {
-                    if let Err(e) = crate::theme_transaction::atomic_write(
-                        &dir.join(format!("{key}.json")),
-                        &serde_json::to_vec(&p)?,
-                    ) {
-                        eprintln!("[UI cache] write failed: {e}");
-                    }
+            if keys[index] == palette_key(path, mode, light)
+                && let Some((dir, key)) = ui_dir.zip(keys[index].as_deref())
+            {
+                if let Err(e) = crate::theme_transaction::atomic_write(
+                    &dir.join(format!("{key}.json")),
+                    &serde_json::to_vec(&p)?,
+                ) {
+                    eprintln!("[UI cache] write failed: {e}");
                 }
             }
             values[index] = Some(p);

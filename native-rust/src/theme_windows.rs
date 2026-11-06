@@ -293,10 +293,10 @@ fn plan_with(
         c[1] = c[1].min(0.16);
         let [r, g, b] = theme::from_oklch(c).map(u32::from);
         let mut opacity = 0xc4000000;
-        if let Some(old) = reader(DWM, "ColorizationColor")? {
-            if old.len() == 8 {
-                opacity = u32::from_le_bytes(old[4..].try_into().unwrap()) & 0xff000000;
-            }
+        if let Some(old) = reader(DWM, "ColorizationColor")?
+            && old.len() == 8
+        {
+            opacity = u32::from_le_bytes(old[4..].try_into().unwrap()) & 0xff000000;
         }
         for (key, name, value) in [
             (DWM, "AccentColor", 0xff000000 | b << 16 | g << 8 | r),
@@ -307,10 +307,11 @@ fn plan_with(
             values.push((key, name, dword(value)));
         }
         let mut palette = [0u8; 32];
-        if let Some(old) = reader(ACCENT, "AccentPalette")? {
-            if old.len() == 36 && old[..4] == REG_BINARY.to_le_bytes() {
-                palette.copy_from_slice(&old[4..]);
-            }
+        if let Some(old) = reader(ACCENT, "AccentPalette")?
+            && old.len() == 36
+            && old[..4] == REG_BINARY.to_le_bytes()
+        {
+            palette.copy_from_slice(&old[4..]);
         }
         for (i, l) in [0.90, 0.80, 0.70, c[0], 0.45, 0.34, 0.24]
             .iter()
@@ -394,18 +395,18 @@ pub fn notify(changes: &[Change]) {
                 &mut result,
             );
         }
-        if let Ok(Some(b)) = read(DWM, "ColorizationColor") {
-            if let Some(n) = integer(&b) {
-                SendMessageTimeoutW(
-                    HWND_BROADCAST,
-                    0x320,
-                    n as usize,
-                    1,
-                    SMTO_ABORTIFHUNG,
-                    1000,
-                    &mut result,
-                );
-            }
+        if let Ok(Some(b)) = read(DWM, "ColorizationColor")
+            && let Some(n) = integer(&b)
+        {
+            SendMessageTimeoutW(
+                HWND_BROADCAST,
+                0x320,
+                n as usize,
+                1,
+                SMTO_ABORTIFHUNG,
+                1000,
+                &mut result,
+            );
         }
         SendMessageTimeoutW(
             HWND_BROADCAST,

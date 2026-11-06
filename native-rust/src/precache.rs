@@ -60,10 +60,9 @@ pub fn paint(c: &mut Canvas, p: &Progress, hover: Option<(i32, i32)>) -> Vec<Hit
     let track = Rect::new(c.p(24.), c.p(104.), c.width - c.p(48.), c.p(12.));
     c.fill(track, c.ui.hover);
     let processed = p.created + p.reused + p.failed;
-    let fill = if total > 0 {
-        (track.w as usize * processed / total).min(track.w as usize) as i32
-    } else {
-        track.w
+    let fill = match (track.w as usize * processed).checked_div(total) {
+        Some(w) => w.min(track.w as usize) as i32,
+        None => track.w,
     };
     if fill > 0 {
         c.fill(Rect::new(track.x, track.y, fill, track.h), c.ui.accent);
@@ -259,7 +258,7 @@ mod tests {
         let cancel = AtomicBool::new(false);
         let output = RefCell::new(None);
         run(
-            &[path.clone()],
+            std::slice::from_ref(&path),
             dir.path(),
             Some(dir.path()),
             1,
@@ -270,7 +269,7 @@ mod tests {
         );
         assert_eq!(output.borrow().as_ref().unwrap().created, 12);
         run(
-            &[path.clone()],
+            std::slice::from_ref(&path),
             dir.path(),
             Some(dir.path()),
             2,

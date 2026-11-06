@@ -69,6 +69,7 @@ enum Work {
     RemoteChanged,
     Stop,
 }
+#[allow(clippy::large_enum_variant)]
 enum Update {
     Model(Model),
     Sensors(Sensors),
@@ -181,20 +182,6 @@ fn visible_sensor_key(s: &Sensors) -> String {
     )
 }
 
-#[cfg(test)]
-mod wifi_refresh_tests {
-    use super::*;
-
-    #[test]
-    fn adapter_changes_refresh_a_disconnected_bar() {
-        let mut sensors = Sensors::default();
-        let missing = visible_sensor_key(&sensors);
-        sensors.wifi_available = true;
-        assert_ne!(visible_sensor_key(&sensors), missing);
-        sensors.wifi_available = false;
-        assert_eq!(visible_sensor_key(&sensors), missing);
-    }
-}
 fn make_state(
     root: &std::path::Path,
     scale: f64,
@@ -217,14 +204,14 @@ fn make_state(
         bar_settings: None,
     }
 }
-fn scene(m: &ipc::Monitor, model: &Model, s: &Sensors) -> Scene {
+fn scene(m: &ipc::Monitor, model: &Model, s: &Sensors, clock: &str) -> Scene {
     Scene::Bar {
         monitor: m.clone(),
         sensors: s.clone(),
         paused: model.paused,
         resize: model.resize,
         vertical: model.vertical,
-        clock: views::clock(),
+        clock: clock.to_string(),
         brightness: None,
         weather: None,
     }
@@ -1197,7 +1184,7 @@ pub fn run_with_popup(
                                 bounds.y += bounds.h + 10;
                             }
                             if let Some(bar) = bars.get_mut(&m.name) {
-                                let mut new_scene = scene(m, &model, &sensors);
+                                let mut new_scene = scene(m, &model, &sensors, &last_clock);
                                 if let Scene::Bar {
                                     weather: current, ..
                                 } = &mut new_scene
@@ -1218,7 +1205,7 @@ pub fn run_with_popup(
                                     make_state(
                                         &root,
                                         m.scale,
-                                        scene(m, &model, &sensors),
+                                        scene(m, &model, &sensors, &last_clock),
                                         true,
                                         &ntx,
                                     ),
@@ -2217,6 +2204,7 @@ pub fn run_with_popup(
                                             ) {
                                                 let new_clk =
                                                     views::clock_formatted(v.clock_format_idx);
+                                                last_clock = new_clk.clone();
                                                 for b in bars.values() {
                                                     if let Scene::Bar { clock: label, .. } =
                                                         &mut b.window.state.borrow_mut().scene
@@ -2258,6 +2246,7 @@ pub fn run_with_popup(
                             }
                             if matches!(&edit, E::CycleClockFormat | E::SetClockFormat(_)) {
                                 let new_clk = views::clock_formatted(s.clock_format_idx);
+                                last_clock = new_clk.clone();
                                 for b in bars.values() {
                                     if let Scene::Bar { clock: label, .. } =
                                         &mut b.window.state.borrow_mut().scene
@@ -2915,15 +2904,14 @@ pub fn signal(root: &std::path::Path, argument: &str) -> Result<()> {
         _ => anyhow::bail!("Unknown resident command"),
     };
     unsafe {
-        if matches!(argument, "--sheet" | "--wallpaper" | "--settings") {
-            if let Some(pid) = std::fs::read(root.join("rust-ready.json"))
+        if matches!(argument, "--sheet" | "--wallpaper" | "--settings")
+            && let Some(pid) = std::fs::read(root.join("rust-ready.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
                 .and_then(|v| v["pid"].as_u64())
                 .filter(|p| *p > 0 && *p <= u32::MAX as u64)
-            {
-                AllowSetForegroundWindow(pid as u32);
-            }
+        {
+            AllowSetForegroundWindow(pid as u32);
         }
         let h = OpenEventW(
             EVENT_MODIFY_STATE,
@@ -2936,4 +2924,19 @@ pub fn signal(root: &std::path::Path, argument: &str) -> Result<()> {
         ensure!(success != 0, "Resident command failed: {name}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod wifi_refresh_tests {
+    use super::*;
+
+    #[test]
+    fn adapter_changes_refresh_a_disconnected_bar() {
+        let mut sensors = Sensors::default();
+        let missing = visible_sensor_key(&sensors);
+        sensors.wifi_available = true;
+        assert_ne!(visible_sensor_key(&sensors), missing);
+        sensors.wifi_available = false;
+        assert_eq!(visible_sensor_key(&sensors), missing);
+    }
 }

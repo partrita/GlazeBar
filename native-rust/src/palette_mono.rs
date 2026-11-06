@@ -3,32 +3,7 @@ use crate::{
     theme::{self, Palette},
 };
 use anyhow::Result;
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn normal_and_monochromatic_match_go() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            colors: Vec<String>,
-            weights: Option<Vec<f64>>,
-            light: bool,
-            mode: String,
-            expected: Palette,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../fixtures/mono-go.json")).unwrap();
-        assert_eq!(cases.len(), 296);
-        for (i, c) in cases.into_iter().enumerate() {
-            assert_eq!(
-                generate(&c.colors, c.weights.as_deref(), c.light, &c.mode).unwrap(),
-                c.expected,
-                "mono case {i}, {}",
-                c.mode
-            );
-        }
-    }
-}
+
 fn monochrome(colors: &[String], weights: Option<&[f64]>) -> bool {
     if colors.is_empty() {
         return false;
@@ -215,4 +190,31 @@ pub fn generate(
     };
     base::normalize(&mut p);
     Ok(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn normal_and_monochromatic_match_go() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            colors: Vec<String>,
+            weights: Option<Vec<f64>>,
+            light: bool,
+            mode: String,
+            expected: Palette,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../fixtures/mono-go.json")).unwrap();
+        assert_eq!(cases.len(), 296);
+        for (i, c) in cases.into_iter().enumerate() {
+            assert_eq!(
+                generate(&c.colors, c.weights.as_deref(), c.light, &c.mode).unwrap(),
+                c.expected,
+                "mono case {i}, {}",
+                c.mode
+            );
+        }
+    }
 }

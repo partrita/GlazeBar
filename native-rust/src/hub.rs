@@ -72,10 +72,10 @@ impl Hub {
     }
 
     pub fn switch(&mut self, tab: Tab) {
-        if self.tab == Tab::Theme {
-            if let Some(picker) = &self.picker {
-                self.settings.targets = picker.all_targets();
-            }
+        if self.tab == Tab::Theme
+            && let Some(picker) = &self.picker
+        {
+            self.settings.targets = picker.all_targets();
         }
         self.tab = tab;
         self.settings.open_dropdown = None;

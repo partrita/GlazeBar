@@ -45,10 +45,11 @@ pub fn focused_border(source: &str, accent: &str) -> Result<String> {
             );
             changed += 1;
         }
-        if let Some((key, rest)) = trimmed.split_once(':') {
-            if !key.is_empty() && rest.split('#').next().unwrap_or("").trim().is_empty() {
-                stack.push((depth, key.into()));
-            }
+        if let Some((key, rest)) = trimmed.split_once(':')
+            && !key.is_empty()
+            && rest.split('#').next().unwrap_or("").trim().is_empty()
+        {
+            stack.push((depth, key.into()));
         }
     }
     ensure!(
@@ -230,21 +231,21 @@ fn replace_delimited_block_with(
     } else {
         block.to_owned()
     };
-    if let (Some(start), Some(end)) = (source.find(start_marker), source.find(end_marker)) {
-        if start <= end {
-            let mut tail_idx = end + end_marker.len();
-            if source[tail_idx..].starts_with("\r\n") {
-                tail_idx += 2;
-            } else if source[tail_idx..].starts_with('\n') {
-                tail_idx += 1;
-            }
-            return format!(
-                "{}{}{}",
-                &source[..start],
-                formatted_block,
-                &source[tail_idx..]
-            );
+    if let (Some(start), Some(end)) = (source.find(start_marker), source.find(end_marker))
+        && start <= end
+    {
+        let mut tail_idx = end + end_marker.len();
+        if source[tail_idx..].starts_with("\r\n") {
+            tail_idx += 2;
+        } else if source[tail_idx..].starts_with('\n') {
+            tail_idx += 1;
         }
+        return format!(
+            "{}{}{}",
+            &source[..start],
+            formatted_block,
+            &source[tail_idx..]
+        );
     }
     if source.trim().is_empty() {
         formatted_block
@@ -329,15 +330,16 @@ pub fn glazewm_set_scalar(source: &str, section_path: &[&str], key: &str, new_va
             let indent = &original[..depth];
             let comment = original
                 .find('#')
-                .map(|i| format!(" {}", &original[i..].trim_end_matches('\r')))
+                .map(|i| format!(" {}", original[i..].trim_end_matches('\r')))
                 .unwrap_or_default();
             let cr = if original.ends_with('\r') { "\r" } else { "" };
             *line = format!("{indent}{key}: {new_val}{comment}{cr}");
         }
-        if let Some((k, rest)) = trimmed.split_once(':') {
-            if !k.is_empty() && rest.split('#').next().unwrap_or("").trim().is_empty() {
-                stack.push((depth, k.into()));
-            }
+        if let Some((k, rest)) = trimmed.split_once(':')
+            && !k.is_empty()
+            && rest.split('#').next().unwrap_or("").trim().is_empty()
+        {
+            stack.push((depth, k.into()));
         }
     }
     lines.join("\n")
@@ -449,22 +451,22 @@ return config{newline}"
             continue;
         }
         for prefix in ["config.color_scheme", "color_scheme"] {
-            if let Some(rest) = trimmed.strip_prefix(prefix) {
-                if rest.trim_start().starts_with('=') {
-                    let indent_len = line.len() - line.trim_start_matches([' ', '\t']).len();
-                    let indent = &line[..indent_len];
-                    let has_comma = trimmed.ends_with(',');
-                    let suffix = if has_comma { "," } else { "" };
-                    let nl = if line.ends_with("\r\n") {
-                        "\r\n"
-                    } else if line.ends_with('\n') {
-                        "\n"
-                    } else {
-                        ""
-                    };
-                    *line = format!("{indent}{prefix} = \"{scheme_name}\"{suffix}{nl}");
-                    return lines.concat();
-                }
+            if let Some(rest) = trimmed.strip_prefix(prefix)
+                && rest.trim_start().starts_with('=')
+            {
+                let indent_len = line.len() - line.trim_start_matches([' ', '\t']).len();
+                let indent = &line[..indent_len];
+                let has_comma = trimmed.ends_with(',');
+                let suffix = if has_comma { "," } else { "" };
+                let nl = if line.ends_with("\r\n") {
+                    "\r\n"
+                } else if line.ends_with('\n') {
+                    "\n"
+                } else {
+                    ""
+                };
+                *line = format!("{indent}{prefix} = \"{scheme_name}\"{suffix}{nl}");
+                return lines.concat();
             }
         }
     }

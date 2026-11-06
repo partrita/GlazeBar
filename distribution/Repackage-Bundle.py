@@ -64,7 +64,7 @@ def main():
     parser.add_argument('--base', type=Path, required=True)
     parser.add_argument('--bar', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--version', default='0.1.0-preview.7')
+    parser.add_argument('--version', default='0.0.9')
     parser.add_argument('--slim', action='store_true', help='create a slim runtime-only bundle without source and vendor archives')
     parser.add_argument('--wm-runtime', type=Path, help='folder with the rebuilt glazewm.exe and glazewm-watcher.exe')
     parser.add_argument('--wm-source', type=Path, help='git checkout of the modified GlazeWM source')

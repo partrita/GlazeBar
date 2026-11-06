@@ -7,6 +7,7 @@ use std::{
     },
     thread,
 };
+#[allow(clippy::large_enum_variant)]
 pub enum Item {
     Image(PathBuf, Option<Arc<image::RgbaImage>>),
     Palette(Result<crate::theme::Palette, String>),

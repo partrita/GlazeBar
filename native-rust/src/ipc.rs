@@ -236,10 +236,7 @@ pub fn subscribe(mut changed: impl FnMut(), stop: &std::sync::atomic::AtomicBool
                         if matches!(
                             e.kind(),
                             std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                        ) =>
-                    {
-                        ()
-                    }
+                        ) => {}
                     Err(e) => return Err(e.into()),
                 }
             }

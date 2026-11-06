@@ -3,33 +3,7 @@ use crate::{
     theme::{self, Palette},
 };
 use anyhow::{Result, bail};
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn remaining_styles_match_go() {
-        #[derive(serde::Deserialize)]
-        struct Case {
-            colors: Vec<String>,
-            weights: Option<Vec<f64>>,
-            light: bool,
-            mode: String,
-            expected: Palette,
-        }
-        let cases: Vec<Case> =
-            serde_json::from_str(include_str!("../fixtures/extra-styles-go.json")).unwrap();
-        assert_eq!(cases.len(), 1980);
-        for (i, c) in cases.into_iter().enumerate() {
-            assert_eq!(
-                crate::palette_mono::generate(&c.colors, c.weights.as_deref(), c.light, &c.mode)
-                    .unwrap(),
-                c.expected,
-                "extra style case {i}, {}",
-                c.mode
-            );
-        }
-    }
-}
+
 fn dominant_hue(colors: &[String]) -> f64 {
     let mut hue = 0.;
     let mut best = 0.;
@@ -295,4 +269,32 @@ fn mood(colors: &[String], light: bool, mode: &str) -> Result<Palette> {
     }
     base::finalize(&mut p);
     Ok(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn remaining_styles_match_go() {
+        #[derive(serde::Deserialize)]
+        struct Case {
+            colors: Vec<String>,
+            weights: Option<Vec<f64>>,
+            light: bool,
+            mode: String,
+            expected: Palette,
+        }
+        let cases: Vec<Case> =
+            serde_json::from_str(include_str!("../fixtures/extra-styles-go.json")).unwrap();
+        assert_eq!(cases.len(), 1980);
+        for (i, c) in cases.into_iter().enumerate() {
+            assert_eq!(
+                crate::palette_mono::generate(&c.colors, c.weights.as_deref(), c.light, &c.mode)
+                    .unwrap(),
+                c.expected,
+                "extra style case {i}, {}",
+                c.mode
+            );
+        }
+    }
 }

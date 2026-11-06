@@ -19,16 +19,16 @@
 #endif
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0-preview.7"
+  #define AppVersion "0.0.9"
 #endif
 
 [Setup]
 AppId={#ProductId}
 AppName=GlazeBar + GlazeWM
 AppVersion={#AppVersion}
-AppPublisher=lamininA1
-AppPublisherURL=https://github.com/lamininA1/GlazeBar
-AppSupportURL=https://github.com/lamininA1/GlazeBar/issues
+AppPublisher=deepthough
+AppPublisherURL=https://github.com/partrita/GlazeBar
+AppSupportURL=https://github.com/partrita/GlazeBar/issues
 DefaultDirName={localappdata}\Programs\GlazeBar-GlazeWM
 DefaultGroupName=GlazeBar + GlazeWM
 PrivilegesRequired=lowest

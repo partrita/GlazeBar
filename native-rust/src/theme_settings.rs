@@ -453,9 +453,7 @@ mod tests {
         .unwrap();
         let parsed = Document::new(&chrome).unwrap().parse().unwrap();
         assert_eq!(
-            parsed
-                .at(&["browser", "theme", "color_scheme2"])
-                .map(|n| value(n)),
+            parsed.at(&["browser", "theme", "color_scheme2"]).map(value),
             Some(serde_json::json!(2))
         );
     }
