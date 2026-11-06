@@ -133,6 +133,14 @@ def main():
                 item.unlink(missing_ok=True)
             for item in list(source_dir.glob('*.tar*')):
                 item.unlink(missing_ok=True)
+        upstream_dir = folder / 'upstream'
+        if upstream_dir.exists():
+            shutil.rmtree(upstream_dir, ignore_errors=True)
+            manifest.pop('glazewmMsi', None)
+        for sub in ['glazebar', 'glazewm']:
+            lic_sub = folder / 'licenses' / sub
+            if lic_sub.exists():
+                shutil.rmtree(lic_sub, ignore_errors=True)
     manifest['version'] = args.version
     manifest['files'] = [{'path': p.relative_to(folder).as_posix(), 'sha256': sha(p.read_bytes())}
                          for p in sorted(folder.rglob('*')) if p.is_file() and p.name != 'manifest.json']
