@@ -65,18 +65,7 @@ try {
             $version = & $cli --version
             if ($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'glazewm 3.10.1') { throw 'This bundle requires GlazeWM 3.10.1. Existing installation was not changed.' }
         } else {
-            $msi = if ($manifest.glazewmMsi -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot $manifest.glazewmMsi))) {
-                Join-Path $PSScriptRoot $manifest.glazewmMsi
-            } else {
-                $download = Join-Path ([IO.Path]::GetTempPath()) ("standalone-glazewm-v3.10.1-$($manifest.architecture).msi")
-                if (!(Test-Path -LiteralPath $download)) {
-                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                    $msiUrl = "https://github.com/glzr-io/glazewm/releases/download/v3.10.1/standalone-glazewm-v3.10.1-$($manifest.architecture).msi"
-                    Write-Output "GlazeWM CLI not found. Downloading official GlazeWM 3.10.1 MSI..."
-                    Invoke-WebRequest -UseBasicParsing $msiUrl -OutFile $download
-                }
-                $download
-            }
+            $msi = Join-Path $PSScriptRoot $manifest.glazewmMsi
             $process = Start-Process msiexec.exe -ArgumentList @('/i', ('"' + $msi + '"'), '/passive', '/norestart') -Wait -PassThru -WindowStyle Hidden
             if ($process.ExitCode -notin @(0,3010)) { throw "GlazeWM installation failed: $($process.ExitCode)" }
             if (!(Test-Path -LiteralPath $cli)) { throw 'GlazeWM CLI was not found after installation.' }

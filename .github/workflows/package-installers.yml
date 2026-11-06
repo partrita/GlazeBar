@@ -93,11 +93,7 @@ jobs:
           Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeBar.exe"
           Copy-Item "$binDir/glazebar-native.exe" "$outDir/GlazeTheme.exe"
           
-          if (Get-Command 7z -ErrorAction SilentlyContinue) {
-            7z a -tzip -mx=9 -mfb=258 -mpass=15 "GlazeBar-windows-${{ matrix.arch }}.zip" "./$outDir/*"
-          } else {
-            Compress-Archive -Path "$outDir/*" -DestinationPath "GlazeBar-windows-${{ matrix.arch }}.zip" -Force
-          }
+          Compress-Archive -Path "$outDir/*" -DestinationPath "GlazeBar-windows-${{ matrix.arch }}.zip" -Force
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
@@ -248,11 +244,7 @@ jobs:
               $archBundle = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
               ./distribution/Test-Bundle.ps1 -Bundle $archBundle
               # Also compress the community bundle into zip for release
-              if (Get-Command 7z -ErrorAction SilentlyContinue) {
-                7z a -tzip -mx=9 -mfb=258 -mpass=15 "release-output/GlazeBar-Community-$version-windows-$arch.zip" "./$archBundle/*"
-              } else {
-                Compress-Archive -Path "$archBundle/*" -DestinationPath "release-output/GlazeBar-Community-$version-windows-$arch.zip" -Force
-              }
+              Compress-Archive -Path "$archBundle/*" -DestinationPath "release-output/GlazeBar-Community-$version-windows-$arch.zip" -Force
             }
 
             Write-Host "Compiling installers using Build-Setup.ps1..."
