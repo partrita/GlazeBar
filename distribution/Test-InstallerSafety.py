@@ -42,6 +42,14 @@ def test_cargo_release_profile():
         "CRITICAL: .cargo/config.toml contains '/OPT:ICF'. "
         "Identical code folding changes PE section headers and triggers heuristic detection."
     )
+    assert "/RELEASE" in cargo_config, (
+        "CRITICAL: .cargo/config.toml must specify '/RELEASE' linker flag to populate PE checksum."
+    )
+    
+    rc_content = (REPO_ROOT / "native-rust/glazebar.rc").read_text(encoding="utf-8")
+    assert "glazebar.manifest" in rc_content, "glazebar.rc must embed glazebar.manifest."
+    manifest_content = (REPO_ROOT / "native-rust/glazebar.manifest").read_text(encoding="utf-8")
+    assert "asInvoker" in manifest_content, "glazebar.manifest must specify asInvoker."
     print("  [OK] Cargo release profile and linker configuration are AV-safe.")
 
 def test_installer_scripts():

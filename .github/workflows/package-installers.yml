@@ -162,69 +162,49 @@ jobs:
           New-Item -ItemType Directory -Force -Path release-output | Out-Null
           Get-ChildItem -Path downloaded-artifacts -Filter "*.zip" -Recurse | Copy-Item -Destination release-output/ -Force
 
-          # 1. Check if Community bundle ZIPs are already uploaded to current release
+          # 1. Prepare bundle directory and extract newly built artifacts
           $bundleRoot = "distribution/output-release"
           New-Item -ItemType Directory -Force -Path $bundleRoot | Out-Null
           $hasBundles = $false
 
-          try {
-            gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern 'GlazeBar-Community-*-windows-*.zip' --pattern SHA256SUMS.txt --dir downloaded-bundles
-            if ($LASTEXITCODE -eq 0 -and (Test-Path downloaded-bundles)) {
-              foreach ($arch in 'x64', 'arm64') {
-                $zipFile = Get-ChildItem -Path downloaded-bundles -Filter "*windows-$arch.zip" | Select-Object -First 1
-                if ($zipFile) {
-                  $targetDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
-                  Expand-Archive -Path $zipFile.FullName -DestinationPath $targetDir -Force
-                  if (Test-Path "$targetDir/manifest.json") {
-                    $hasBundles = $true
-                  }
-                }
-              }
-            }
-          } catch {
-            Write-Host "No pre-existing bundles found in current release tag: $_"
+          # Extract GlazeBar.exe from downloaded build artifacts
+          $artifactZips = Get-ChildItem -Path downloaded-artifacts -Filter "*.zip" -Recurse
+          foreach ($az in $artifactZips) {
+            Write-Host "Extracting build artifact: $($az.FullName)"
+            Expand-Archive -Path $az.FullName -DestinationPath $az.DirectoryName -Force
           }
 
-          # 2. If not found in current release, fetch upstream base bundle to repackage with newly built GlazeBar
-          if (!$hasBundles) {
-            Write-Host "Attempting to repackage base bundle from upstream release (v0.1.0-preview.7)..."
-            New-Item -ItemType Directory -Force -Path upstream-base | Out-Null
-            try {
-              gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
-              if ($LASTEXITCODE -eq 0 -and (Test-Path upstream-base)) {
-                # Extract GlazeBar.exe from downloaded build artifacts
-                $artifactZips = Get-ChildItem -Path downloaded-artifacts -Filter "*.zip" -Recurse
-                foreach ($az in $artifactZips) {
-                  Write-Host "Extracting build artifact: $($az.FullName)"
-                  Expand-Archive -Path $az.FullName -DestinationPath $az.DirectoryName -Force
-                }
+          # 2. Always repackage base bundle from upstream release with newly built GlazeBar
+          Write-Host "Repackaging base bundle from upstream release (v0.1.0-preview.7) with newly built GlazeBar..."
+          New-Item -ItemType Directory -Force -Path upstream-base | Out-Null
+          try {
+            gh release download v0.1.0-preview.7 --repo lamininA1/GlazeBar --pattern 'GlazeBar-Community-*-windows-*.zip' --dir upstream-base
+            if ($LASTEXITCODE -eq 0 -and (Test-Path upstream-base)) {
+              $repackageSuccess = $true
+              foreach ($arch in 'x64', 'arm64') {
+                $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
+                $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
+                  if ($arch -eq 'x64') { $_.FullName -like "*windows-x64*" } else { $_.FullName -like "*windows-arm64*" }
+                } | Select-Object -First 1
 
-                $repackageSuccess = $true
-                foreach ($arch in 'x64', 'arm64') {
-                  $baseZip = Get-ChildItem -Path upstream-base -Filter "*windows-$arch.zip" | Select-Object -First 1
-                  $barExe = Get-ChildItem -Path downloaded-artifacts -Filter "GlazeBar.exe" -Recurse | Where-Object {
-                    if ($arch -eq 'x64') { $_.FullName -like "*windows-x64*" } else { $_.FullName -like "*windows-arm64*" }
-                  } | Select-Object -First 1
-
-                  if ($baseZip -and $barExe) {
-                    Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName) (Slim)..."
-                    python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version --slim
-                    $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
-                    if (!(Test-Path "$expectedDir/manifest.json")) {
-                      Write-Warning "Repackaged bundle missing manifest: $expectedDir"
-                      $repackageSuccess = $false
-                    }
-                  } else {
-                    Write-Warning "Missing baseZip or barExe for $arch (baseZip: $($baseZip?.Name), barExe: $($barExe?.FullName))"
+                if ($baseZip -and $barExe) {
+                  Write-Host "Repackaging $arch bundle using $($baseZip.Name) and $($barExe.FullName) (Slim)..."
+                  python distribution/Repackage-Bundle.py --base $baseZip.FullName --bar $barExe.FullName --output $bundleRoot --version $version --slim
+                  $expectedDir = "$bundleRoot/GlazeBar-Community-$version-windows-$arch"
+                  if (!(Test-Path "$expectedDir/manifest.json")) {
+                    Write-Warning "Repackaged bundle missing manifest: $expectedDir"
                     $repackageSuccess = $false
                   }
+                } else {
+                  Write-Warning "Missing baseZip or barExe for $arch (baseZip: $($baseZip?.Name), barExe: $($barExe?.FullName))"
+                  $repackageSuccess = $false
                 }
-                $hasBundles = $repackageSuccess
               }
-            } catch {
-              Write-Warning "Repackage base bundle failed: $_"
-              $hasBundles = $false
+              $hasBundles = $repackageSuccess
             }
+          } catch {
+            Write-Warning "Repackage base bundle failed: $_"
+            $hasBundles = $false
           }
 
           # Verify both bundle folders exist and contain manifest.json before proceeding to installer build

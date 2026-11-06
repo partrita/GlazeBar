@@ -39,6 +39,25 @@ mod tests {
             !cargo_config.contains("/OPT:ICF"),
             "CRITICAL: Linker flag /OPT:ICF alters PE section alignment, triggering heuristics."
         );
+        assert!(
+            cargo_config.contains("/RELEASE"),
+            "CRITICAL: .cargo/config.toml must specify '/RELEASE' linker flag to populate PE checksum."
+        );
+
+        let rc = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("glazebar.rc"))
+            .expect("read glazebar.rc");
+        assert!(
+            rc.contains("glazebar.manifest"),
+            "glazebar.rc must embed glazebar.manifest."
+        );
+        let manifest = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("glazebar.manifest"),
+        )
+        .expect("read glazebar.manifest");
+        assert!(
+            manifest.contains("asInvoker"),
+            "glazebar.manifest must specify asInvoker."
+        );
     }
 
     #[test]
