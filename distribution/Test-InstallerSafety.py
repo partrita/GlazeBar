@@ -9,6 +9,14 @@ import sys
 import re
 from pathlib import Path
 
+# Ensure stdout/stderr handle any encoding gracefully
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def test_cargo_release_profile():
@@ -34,7 +42,7 @@ def test_cargo_release_profile():
         "CRITICAL: .cargo/config.toml contains '/OPT:ICF'. "
         "Identical code folding changes PE section headers and triggers heuristic detection."
     )
-    print("  ✓ Cargo release profile and linker configuration are AV-safe.")
+    print("  [OK] Cargo release profile and linker configuration are AV-safe.")
 
 def test_installer_scripts():
     print("[2/4] Checking installer scripts for AMSI & AV heuristic triggers...")
@@ -72,7 +80,7 @@ def test_installer_scripts():
     assert "-ExecutionPolicy Bypass" not in bridge_ps1, (
         "Setup-Bridge.ps1 must not use '-ExecutionPolicy Bypass'."
     )
-    print("  ✓ Installer scripts contain no dropper or execution policy triggers.")
+    print("  [OK] Installer scripts contain no dropper or execution policy triggers.")
 
 def test_bundle_repackaging():
     print("[3/4] Checking bundle repackaging logic...")
@@ -84,7 +92,7 @@ def test_bundle_repackaging():
     assert "manifest.pop('glazewmMsi'" not in repackage_py, (
         "CRITICAL: Repackage-Bundle.py must NOT remove glazewmMsi from manifest."
     )
-    print("  ✓ Bundle repackaging retains upstream signed MSI.")
+    print("  [OK] Bundle repackaging retains upstream signed MSI.")
 
 def test_codeql_safeguards():
     print("[4/4] Checking CodeQL static analysis patterns...")
@@ -96,7 +104,7 @@ def test_codeql_safeguards():
     assert 'codeql[rust/hard-coded-cryptographic-value]' in wifi_rs, (
         "wifi.rs should include CodeQL exclusion comment for password validation test."
     )
-    print("  ✓ CodeQL test patterns are properly constructed.")
+    print("  [OK] CodeQL test patterns are properly constructed.")
 
 def main():
     print("==================================================================")
@@ -108,11 +116,11 @@ def main():
         test_bundle_repackaging()
         test_codeql_safeguards()
         print("==================================================================")
-        print("  ✓ ALL SAFETY AND REGRESSION CHECKS PASSED.")
+        print("  [PASS] ALL SAFETY AND REGRESSION CHECKS PASSED.")
         print("==================================================================")
         return 0
     except AssertionError as e:
-        print(f"\n❌ REGRESSION FAILURE:\n{e}\n", file=sys.stderr)
+        print(f"\n[FAIL] REGRESSION FAILURE:\n{e}\n", file=sys.stderr)
         return 1
 
 if __name__ == "__main__":
