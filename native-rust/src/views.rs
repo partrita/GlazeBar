@@ -6,6 +6,7 @@ use crate::{
 };
 use chrono::{Datelike, Timelike};
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum Action {
     Command(String),
     Scale,
@@ -34,6 +35,12 @@ pub enum Action {
     QuickTheme,
     QuickThemeSelect(String),
     QuickThemeLight(bool),
+    VolumeMute,
+    VolumeSet(u8),
+    MediaPlayPause,
+    MediaNext,
+    MediaPrev,
+    CaffeineToggle,
 }
 #[derive(Clone, Debug)]
 pub struct Hit {
@@ -335,6 +342,65 @@ pub fn bar_with_settings(
                     ui.muted,
                     Some(Action::Wifi),
                 );
+            }
+            "volume" if settings.show_volume => {
+                let (icon, text, color) = if s.muted {
+                    ("volume-x", "Mute".to_string(), ui.muted)
+                } else {
+                    ("volume-2", format!("{}%", s.volume), ui.text)
+                };
+                metric(
+                    c,
+                    &mut right,
+                    &mut hits,
+                    icon,
+                    &text,
+                    color,
+                    Some(Action::VolumeMute),
+                );
+                if s.media_playing && !s.media_title.is_empty() {
+                    let display_title = if s.media_title.chars().count() > 20 {
+                        format!("{}…", s.media_title.chars().take(19).collect::<String>())
+                    } else {
+                        s.media_title.clone()
+                    };
+                    metric(
+                        c,
+                        &mut right,
+                        &mut hits,
+                        "play",
+                        &display_title,
+                        ui.muted,
+                        Some(Action::MediaPlayPause),
+                    );
+                }
+            }
+            "caffeine" if settings.show_caffeine => {
+                let (icon, text, color) = if s.caffeine {
+                    ("coffee", "ON", ui.warning)
+                } else {
+                    ("coffee", "", ui.muted)
+                };
+                if text.is_empty() {
+                    let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
+                    c.icon(
+                        icon,
+                        Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
+                        color,
+                    );
+                    hit(&mut hits, r, Action::CaffeineToggle);
+                    right = r.x - c.p(12.);
+                } else {
+                    metric(
+                        c,
+                        &mut right,
+                        &mut hits,
+                        icon,
+                        text,
+                        color,
+                        Some(Action::CaffeineToggle),
+                    );
+                }
             }
             "tiling" if settings.show_tiling => {
                 let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));

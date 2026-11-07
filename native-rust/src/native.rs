@@ -579,6 +579,20 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                         ));
                     }
                 }
+                if s.hits.iter().any(|hit| {
+                    (hit.action == Action::VolumeMute || matches!(hit.action, Action::VolumeSet(_)))
+                        && hit.rect.contains(pos.x, pos.y)
+                }) {
+                    if let Scene::Bar { sensors, .. } = &s.scene {
+                        let step: i32 = if ((wp >> 16) as u16) as i16 > 0 {
+                            5
+                        } else {
+                            -5
+                        };
+                        let new_vol = (sensors.volume as i32 + step).clamp(0, 100) as u8;
+                        s.send(NativeEvent::Action(h as usize, Action::VolumeSet(new_vol)));
+                    }
+                }
                 return 0;
             }
             WM_CTLCOLOREDIT => {

@@ -128,6 +128,12 @@ def test_bundle_repackaging():
     assert 'throw "Repackage-Bundle.py failed' in workflow_yml, (
         "package-installers.yml must check $LASTEXITCODE and fail immediately if Repackage-Bundle.py fails."
     )
+    assert "exceeds 20MB limit" in workflow_yml, (
+        "package-installers.yml must enforce bundle size limit (< 20MB) to prevent bloat."
+    )
+    assert "exceeds 15MB limit" in workflow_yml, (
+        "package-installers.yml must enforce installer size limit (< 15MB)."
+    )
     print("  [OK] Bundle repackaging retains upstream signed MSI and enforces slimming.")
 
 def test_codeql_safeguards():

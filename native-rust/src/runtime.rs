@@ -166,7 +166,7 @@ fn request_refresh(tx: &SyncSender<Work>, pending: &AtomicBool) {
 }
 fn visible_sensor_key(s: &Sensors) -> String {
     format!(
-        "{:.0}/{:.0}/{:.0}/{:.1}/{}/{}/{}/{}/{}/{:.1}/{:.1}/{}",
+        "{:.0}/{:.0}/{:.0}/{:.1}/{}/{}/{}/{}/{}/{:.1}/{:.1}/{}/{}/{}/{}/{}",
         s.cpu,
         s.memory,
         s.percent,
@@ -178,7 +178,11 @@ fn visible_sensor_key(s: &Sensors) -> String {
         s.network,
         s.full,
         s.remaining,
-        s.wifi_available
+        s.wifi_available,
+        s.volume,
+        s.muted,
+        s.caffeine,
+        s.media_title
     )
 }
 
@@ -2500,6 +2504,62 @@ pub fn run_with_popup(
                                 }
                             }
                             w.invalidate();
+                        }
+                    }
+                    Action::VolumeMute => {
+                        let _ = crate::media_audio::toggle_mute();
+                        let (vol, mute) = crate::media_audio::get_volume_and_mute();
+                        sensors.volume = vol;
+                        sensors.muted = mute;
+                        for bar in bars.values() {
+                            if let Scene::Bar { sensors: s, .. } =
+                                &mut bar.window.state.borrow_mut().scene
+                            {
+                                s.volume = vol;
+                                s.muted = mute;
+                            }
+                            bar.window.invalidate();
+                        }
+                    }
+                    Action::VolumeSet(vol) => {
+                        let _ = crate::media_audio::set_volume(vol);
+                        sensors.volume = vol;
+                        sensors.muted = false;
+                        for bar in bars.values() {
+                            if let Scene::Bar { sensors: s, .. } =
+                                &mut bar.window.state.borrow_mut().scene
+                            {
+                                s.volume = vol;
+                                s.muted = false;
+                            }
+                            bar.window.invalidate();
+                        }
+                    }
+                    Action::MediaPlayPause => {
+                        crate::media_audio::send_media_command(
+                            crate::media_audio::MediaCommand::PlayPause,
+                        );
+                    }
+                    Action::MediaNext => {
+                        crate::media_audio::send_media_command(
+                            crate::media_audio::MediaCommand::Next,
+                        );
+                    }
+                    Action::MediaPrev => {
+                        crate::media_audio::send_media_command(
+                            crate::media_audio::MediaCommand::Prev,
+                        );
+                    }
+                    Action::CaffeineToggle => {
+                        sensors.caffeine = !sensors.caffeine;
+                        crate::media_audio::set_caffeine(sensors.caffeine);
+                        for bar in bars.values() {
+                            if let Scene::Bar { sensors: s, .. } =
+                                &mut bar.window.state.borrow_mut().scene
+                            {
+                                s.caffeine = sensors.caffeine;
+                            }
+                            bar.window.invalidate();
                         }
                     }
                     Action::Scale => {

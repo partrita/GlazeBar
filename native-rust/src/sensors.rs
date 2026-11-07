@@ -29,6 +29,11 @@ pub struct Sensors {
     pub network: String,
     pub signal: u32,
     pub wifi_available: bool,
+    pub volume: u8,
+    pub muted: bool,
+    pub media_title: String,
+    pub media_playing: bool,
+    pub caffeine: bool,
 }
 struct Device {
     handle: HANDLE,
@@ -209,7 +214,13 @@ impl Reader {
                     s.memory = m.dwMemoryLoad as f64;
                 }
                 (s.wifi_available, s.network, s.signal) = connected_network();
+                let (title, playing) = crate::media_audio::detect_media();
+                s.media_title = title;
+                s.media_playing = playing;
             }
+            let (vol, mute) = crate::media_audio::get_volume_and_mute();
+            s.volume = vol;
+            s.muted = mute;
         }
     }
 }

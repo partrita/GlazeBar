@@ -154,6 +154,27 @@ mod tests {
             repackage_py.contains("(folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)"),
             "Repackage-Bundle.py must remove the duplicate 5MB GlazeTheme.exe binary."
         );
+
+        // 5. CI Release Workflow Safeguards
+        let workflow_yml =
+            std::fs::read_to_string(root.join(".github/workflows/package-installers.yml"))
+                .expect("read package-installers.yml");
+        assert!(
+            workflow_yml.contains("exceeds 20MB limit"),
+            "package-installers.yml must enforce bundle size limit (< 20MB) to prevent bloat."
+        );
+        assert!(
+            workflow_yml.contains("exceeds 15MB limit"),
+            "package-installers.yml must enforce installer size limit (< 15MB)."
+        );
+        assert!(
+            !workflow_yml.contains("GlazeTheme.exe"),
+            "package-installers.yml must not package redundant duplicate GlazeTheme.exe."
+        );
+        assert!(
+            workflow_yml.contains("throw \"Repackage-Bundle.py failed"),
+            "package-installers.yml must fail immediately if repackaging step fails."
+        );
     }
 
     #[test]

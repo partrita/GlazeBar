@@ -224,6 +224,25 @@ jobs:
             Write-Host "Community bundles not assembled. Packaging standalone binaries only."
           }
 
+          # 3.5. Verify package sizes conform to AGENT.md guidelines (prevent bundle bloat > 20MB)
+          Write-Host "Verifying release artifact sizes against AGENT.md limits..."
+          $bundleZips = Get-ChildItem -Path release-output -Filter "GlazeBar-Community-*.zip"
+          foreach ($bz in $bundleZips) {
+            $mb = [math]::Round($bz.Length / 1MB, 2)
+            Write-Host "  $($bz.Name): $mb MB"
+            if ($bz.Length -gt 20MB) {
+              throw "CRITICAL: Bundle size ($mb MB) exceeds 20MB limit. Unslimmed source/vendor archives may have leaked into the release."
+            }
+          }
+          $installers = Get-ChildItem -Path release-output -Filter "GlazeBar-GlazeWM-Setup-*.exe"
+          foreach ($inst in $installers) {
+            $mb = [math]::Round($inst.Length / 1MB, 2)
+            Write-Host "  $($inst.Name): $mb MB"
+            if ($inst.Length -gt 15MB) {
+              throw "CRITICAL: Installer size ($mb MB) exceeds 15MB limit."
+            }
+          }
+
           # 4. Generate SHA256 checksums for all release files
           Get-ChildItem -Path release-output -File | ForEach-Object {
             "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"

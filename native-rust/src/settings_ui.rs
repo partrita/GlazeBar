@@ -77,24 +77,28 @@ pub const OPACITY_STEPS: [(&str, u8); 6] = [
     ("0% (투명)", 0),
 ];
 
-pub const TOPBAR_WIDGET_IDS: [&str; 9] = [
+pub const TOPBAR_WIDGET_IDS: [&str; 11] = [
     "weather",
     "battery",
     "cpu",
     "memory",
     "wifi",
+    "volume",
+    "caffeine",
     "tiling",
     "clock",
     "scale",
     "brightness",
 ];
 
-pub const TOPBAR_WIDGET_NAMES: [&str; 9] = [
+pub const TOPBAR_WIDGET_NAMES: [&str; 11] = [
     "날씨 정보",
     "배터리 / 전력",
     "CPU 사용률",
     "메모리 사용률",
     "Wi-Fi 네트워크",
+    "볼륨 & 미디어",
+    "카페인 (절전 방지)",
     "창 분할 아이콘",
     "시계 (날짜/시간)",
     "디스플레이 배율",
@@ -139,6 +143,10 @@ pub struct BarSettings {
     #[serde(default = "default_true")]
     pub show_wifi: bool,
     #[serde(default = "default_true")]
+    pub show_volume: bool,
+    #[serde(default = "default_true")]
+    pub show_caffeine: bool,
+    #[serde(default = "default_true")]
     pub show_brightness: bool,
     #[serde(default = "default_true")]
     pub show_scale: bool,
@@ -180,6 +188,8 @@ impl Default for BarSettings {
             show_memory: true,
             show_battery: true,
             show_wifi: true,
+            show_volume: true,
+            show_caffeine: true,
             show_brightness: true,
             show_scale: true,
             show_tiling: true,
@@ -208,6 +218,8 @@ pub enum Edit {
     ToggleMemory,
     ToggleBattery,
     ToggleWifi,
+    ToggleVolume,
+    ToggleCaffeine,
     ToggleBrightness,
     ToggleScale,
     ToggleQuickButtons,
@@ -244,6 +256,8 @@ impl BarSettings {
             "cpu" => self.show_cpu,
             "memory" => self.show_memory,
             "wifi" => self.show_wifi,
+            "volume" => self.show_volume,
+            "caffeine" => self.show_caffeine,
             "brightness" => self.show_brightness,
             "scale" => self.show_scale,
             "tiling" => self.show_tiling,
@@ -259,6 +273,8 @@ impl BarSettings {
             "cpu" => self.show_cpu = visible,
             "memory" => self.show_memory = visible,
             "wifi" => self.show_wifi = visible,
+            "volume" => self.show_volume = visible,
+            "caffeine" => self.show_caffeine = visible,
             "brightness" => self.show_brightness = visible,
             "scale" => self.show_scale = visible,
             "tiling" => self.show_tiling = visible,
@@ -339,6 +355,8 @@ impl BarSettings {
             Edit::ToggleMemory => self.show_memory = !self.show_memory,
             Edit::ToggleBattery => self.show_battery = !self.show_battery,
             Edit::ToggleWifi => self.show_wifi = !self.show_wifi,
+            Edit::ToggleVolume => self.show_volume = !self.show_volume,
+            Edit::ToggleCaffeine => self.show_caffeine = !self.show_caffeine,
             Edit::ToggleBrightness => self.show_brightness = !self.show_brightness,
             Edit::ToggleScale => self.show_scale = !self.show_scale,
             Edit::ToggleQuickButtons => self.show_quick_buttons = !self.show_quick_buttons,

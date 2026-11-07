@@ -399,6 +399,7 @@ mod reference;
 mod native;
 
 mod brightness;
+mod media_audio;
 mod power;
 mod precache;
 mod runtime;
