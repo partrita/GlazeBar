@@ -13,7 +13,12 @@ if (!$StageOnly) {
     $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
     $expected = if ($manifest.architecture -eq 'arm64') { 'ARM64' } else { 'AMD64' }
     if ($arch -ne $expected) { throw "Use the package for your Windows architecture ($arch)." }
-    if (Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue) { throw 'Exit GlazeWM and GlazeBar before installing. No running programs were stopped.' }
+    $running = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Output "Stopping running GlazeWM and GlazeBar processes for update..."
+        $running | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 800
+    }
     if (![Environment]::Is64BitProcess) { throw 'Run this installer from 64-bit PowerShell.' }
     # The official GlazeWM MSI needs VC runtime even though GlazeBar links it statically.
     if (!(Test-Path -LiteralPath (Join-Path ([Environment]::SystemDirectory) 'vcruntime140.dll'))) {
@@ -29,8 +34,21 @@ if (!$StageOnly) {
 }
 $target = Join-Path $ProfileRoot '.glzr\glazewm'
 $stateFile = Join-Path $target 'community-install.json'
+$userConfigPath = Join-Path $target 'config.yaml'
+$userThemeStatePath = Join-Path $target 'theme-state'
+$savedUserConfig = $null
+$savedThemeStateDir = $null
+
 if (Test-Path -LiteralPath $stateFile) {
-    Write-Output 'Existing community installation detected. Uninstalling previous version first...'
+    Write-Output 'Existing community installation detected. Preserving settings and uninstalling previous version...'
+    if (Test-Path -LiteralPath $userConfigPath) {
+        $savedUserConfig = [IO.File]::ReadAllText($userConfigPath)
+    }
+    if (Test-Path -LiteralPath $userThemeStatePath) {
+        $savedThemeStateDir = Join-Path ([IO.Path]::GetTempPath()) ('glazebar-theme-state-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Force $savedThemeStateDir | Out-Null
+        Copy-Item -LiteralPath $userThemeStatePath -Destination (Join-Path $savedThemeStateDir 'theme-state') -Recurse -Force
+    }
     $uninstallScript = Join-Path $PSScriptRoot 'Uninstall.ps1'
     $uninstallArgs = @{}
     if ($StageOnly) { $uninstallArgs.StageOnly = $true }
@@ -59,6 +77,16 @@ try {
         } else { Copy-Item -LiteralPath $file.FullName -Destination $dest }
         $entry.sha256 = (Get-FileHash -LiteralPath $dest).Hash
     }
+    if ($savedUserConfig) {
+        $destConfig = Join-Path $target 'config.yaml'
+        $exe = (Join-Path $target 'GlazeBar.exe').Replace("'", "''")
+        $restoredText = $savedUserConfig.Replace('__GLAZEBAR_EXE__', $exe)
+        [IO.File]::WriteAllText($destConfig, $restoredText, (New-Object Text.UTF8Encoding $false))
+    }
+    if ($savedThemeStateDir -and (Test-Path -LiteralPath (Join-Path $savedThemeStateDir 'theme-state'))) {
+        Copy-Item -LiteralPath (Join-Path $savedThemeStateDir 'theme-state') -Destination $target -Recurse -Force
+        Remove-Item -LiteralPath $savedThemeStateDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
     if (!$StageOnly) {
         $cli = Join-Path $env:ProgramFiles 'glzr.io\GlazeWM\cli\glazewm.exe'
         if (Test-Path -LiteralPath $cli) {
@@ -72,7 +100,6 @@ try {
         }
         if ($AutoStart) {
             $shortcutPath = Join-Path ([Environment]::GetFolderPath('Startup')) 'GlazeBar Community.lnk'
-            if (Test-Path -LiteralPath $shortcutPath) { throw 'Startup shortcut already exists; it was not overwritten.' }
             $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
             $link.TargetPath = Join-Path $target 'wm\glazewm.exe'
             $link.Arguments = 'start'

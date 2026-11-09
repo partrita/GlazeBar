@@ -3,7 +3,7 @@
   <assemblyIdentity
     type="win32"
     name="deepthought.GlazeBar"
-    version="0.0.9.0"
+    version="0.0.11.0"
     processorArchitecture="*"
   />
   <description>GlazeBar Status Bar</description>

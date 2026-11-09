@@ -172,15 +172,31 @@ pub fn bar_with_settings(
     settings: &BarSettings,
 ) -> Vec<Hit> {
     let mut hits = vec![];
+    let is_transparent = settings.is_transparent();
+    let saved_ui = c.ui;
+    if is_transparent {
+        c.ui.text = 0x00FFFFFF;
+        c.ui.muted = 0x00FFFFFF;
+        c.ui.border = 0x00FFFFFF;
+        c.ui.accent = 0x00FFFFFF;
+        c.ui.surface = c.ui.bg;
+    }
     let ui = c.ui;
     let h = c.height;
+    let pad_y = c.p(4.).max((h - c.p(24.)) / 2);
+    let ws_h = h - pad_y * 2;
     let mut left = c.p(18.);
-    let logo_rect = Rect::new(left - c.p(4.), c.p(8.), c.p(24.), h - c.p(16.));
+    let logo_rect = Rect::new(left - c.p(4.), (h - c.p(24.)) / 2, c.p(24.), c.p(24.));
     for x in 0..2 {
         for y in 0..2 {
             c.fill(
-                Rect::new(left + x * c.p(8.), c.p(13.) + y * c.p(8.), c.p(6.), c.p(6.)),
-                ui.muted,
+                Rect::new(
+                    left + x * c.p(8.),
+                    (h - c.p(14.)) / 2 + y * c.p(8.),
+                    c.p(6.),
+                    c.p(6.),
+                ),
+                if is_transparent { 0x00FFFFFF } else { ui.muted },
             )
         }
     }
@@ -188,16 +204,33 @@ pub fn bar_with_settings(
     left += c.p(34.);
     for ws in &m.workspaces {
         let width = c.p(28.).max(c.measure(&ws.display, 12.5, true) + c.p(16.));
-        let r = Rect::new(left, c.p(8.), width, h - c.p(16.));
-        c.fill(
-            r,
-            if ws.focused || ws.displayed {
-                ui.selected
+        let r = Rect::new(left, pad_y, width, ws_h);
+        if is_transparent {
+            let is_active = ws.focused || ws.displayed;
+            if is_active {
+                c.frame(r, 0x00FFFFFF);
+                let inner = Rect::new(
+                    r.x + 1,
+                    r.y + 1,
+                    r.w.saturating_sub(2),
+                    r.h.saturating_sub(2),
+                );
+                c.frame(inner, 0x00FFFFFF);
             } else {
-                ui.surface
-            },
-        );
-        c.text(&ws.display, r, ui.text, 12.5, true, 1);
+                c.frame(r, 0x00888888);
+            }
+            c.text(&ws.display, r, 0x00FFFFFF, 12.5, true, 1);
+        } else {
+            c.fill(
+                r,
+                if ws.focused || ws.displayed {
+                    ui.selected
+                } else {
+                    ui.surface
+                },
+            );
+            c.text(&ws.display, r, ui.text, 12.5, true, 1);
+        }
         hit(
             &mut hits,
             r,
@@ -213,9 +246,14 @@ pub fn bar_with_settings(
             ("단축키", Action::Sheet),
         ] {
             let width = c.measure(label, 11.5, false) + c.p(16.);
-            let r = Rect::new(left, c.p(8.), width, h - c.p(16.));
-            c.fill(r, ui.surface);
-            c.text(label, r, ui.muted, 11.5, false, 1);
+            let r = Rect::new(left, pad_y, width, ws_h);
+            if is_transparent {
+                c.frame(r, 0x00888888);
+                c.text(label, r, 0x00FFFFFF, 11.5, false, 1);
+            } else {
+                c.fill(r, ui.surface);
+                c.text(label, r, ui.muted, 11.5, false, 1);
+            }
             hit(&mut hits, r, action);
             left += width + c.p(4.);
         }
@@ -433,12 +471,21 @@ pub fn bar_with_settings(
             }
             "scale" if settings.show_scale => {
                 let sr = Rect::new(right - c.p(28.), (h - c.p(28.)) / 2, c.p(28.), c.p(28.));
-                c.fill(sr, ui.surface);
-                c.icon(
-                    "scaling",
-                    Rect::new(sr.x + c.p(6.), sr.y + c.p(6.), c.p(16.), c.p(16.)),
-                    ui.muted,
-                );
+                if is_transparent {
+                    c.frame(sr, 0x00888888);
+                    c.icon(
+                        "scaling",
+                        Rect::new(sr.x + c.p(6.), sr.y + c.p(6.), c.p(16.), c.p(16.)),
+                        0x00FFFFFF,
+                    );
+                } else {
+                    c.fill(sr, ui.surface);
+                    c.icon(
+                        "scaling",
+                        Rect::new(sr.x + c.p(6.), sr.y + c.p(6.), c.p(16.), c.p(16.)),
+                        ui.muted,
+                    );
+                }
                 hit(&mut hits, sr, Action::Scale);
                 right = sr.x - c.p(12.);
             }
@@ -480,12 +527,10 @@ pub fn bar_with_settings(
             Action::Command("wm-disable-binding-mode --name resize".into()),
         );
     }
-    let is_transparent = crate::settings_ui::OPACITY_STEPS
-        .get(settings.opacity_idx)
-        .is_some_and(|s| s.1 == 0);
     if !is_transparent {
         c.fill(Rect::new(0, h - 1, c.width, 1), ui.border);
     }
+    c.ui = saved_ui;
     hits
 }
 pub fn clock_formatted(idx: usize) -> String {

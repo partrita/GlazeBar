@@ -617,10 +617,11 @@ pub fn run_with_popup(
                 }
                 crate::hooks::Event::Foreground => {
                     let _ = work_tx.try_send(Work::RemoteChanged);
+                    let bar_h = crate::settings_ui::BarSettings::load(&root).bar_height();
                     for m in &model.monitors {
                         if let Some(bar) = bars.get_mut(&m.name) {
                             let mut bounds = m.bounds;
-                            bounds.h = (40. * m.scale).round_ties_even() as i32;
+                            bounds.h = (bar_h * m.scale).round_ties_even() as i32;
                             bar.position(bounds, shadow, hidden);
                         }
                     }
@@ -813,10 +814,12 @@ pub fn run_with_popup(
                         match result {
                             Ok(()) => {
                                 hidden = !hidden;
+                                let bar_h =
+                                    crate::settings_ui::BarSettings::load(&root).bar_height();
                                 for m in &model.monitors {
                                     if let Some(bar) = bars.get_mut(&m.name) {
                                         let mut bounds = m.bounds;
-                                        bounds.h = (40. * m.scale).round_ties_even() as i32;
+                                        bounds.h = (bar_h * m.scale).round_ties_even() as i32;
                                         bar.position(bounds, shadow, hidden);
                                     }
                                 }
@@ -1179,9 +1182,10 @@ pub fn run_with_popup(
                         }
                         model = next;
                         bars.retain(|name, _| model.monitors.iter().any(|m| &m.name == name));
+                        let bar_h = crate::settings_ui::BarSettings::load(&root).bar_height();
                         for m in &model.monitors {
                             let mut bounds = m.bounds;
-                            bounds.h = (40. * m.scale).round_ties_even() as i32;
+                            bounds.h = (bar_h * m.scale).round_ties_even() as i32;
                             if shadow {
                                 bounds.y += bounds.h + 10;
                             }
@@ -1283,8 +1287,9 @@ pub fn run_with_popup(
                     {
                         bar.registered = false;
                         if let Some(m) = model.monitors.iter().find(|m| &m.name == name) {
+                            let bar_h = crate::settings_ui::BarSettings::load(&root).bar_height();
                             let mut bounds = m.bounds;
-                            bounds.h = (40. * m.scale).round_ties_even() as i32;
+                            bounds.h = (bar_h * m.scale).round_ties_even() as i32;
                             bar.position(bounds, shadow, hidden);
                         }
                     }
@@ -2202,6 +2207,24 @@ pub fn run_with_popup(
                                             }
                                             if matches!(
                                                 other,
+                                                E::CycleBarHeight | E::SetBarHeight(_)
+                                            ) {
+                                                let bar_h = v.bar_height();
+                                                for m in &model.monitors {
+                                                    if let Some(b) = bars.get_mut(&m.name) {
+                                                        let mut bounds = m.bounds;
+                                                        bounds.h = (bar_h * m.scale)
+                                                            .round_ties_even()
+                                                            as i32;
+                                                        if shadow {
+                                                            bounds.y += bounds.h + 10;
+                                                        }
+                                                        b.position(bounds, shadow, hidden);
+                                                    }
+                                                }
+                                            }
+                                            if matches!(
+                                                other,
                                                 E::CycleClockFormat | E::SetClockFormat(_)
                                             ) {
                                                 let new_clk =
@@ -2244,6 +2267,19 @@ pub fn run_with_popup(
                                     b.window.set_opacity(
                                         crate::settings_ui::OPACITY_STEPS[s.opacity_idx].1,
                                     );
+                                }
+                            }
+                            if matches!(&edit, E::CycleBarHeight | E::SetBarHeight(_)) {
+                                let bar_h = s.bar_height();
+                                for m in &model.monitors {
+                                    if let Some(b) = bars.get_mut(&m.name) {
+                                        let mut bounds = m.bounds;
+                                        bounds.h = (bar_h * m.scale).round_ties_even() as i32;
+                                        if shadow {
+                                            bounds.y += bounds.h + 10;
+                                        }
+                                        b.position(bounds, shadow, hidden);
+                                    }
                                 }
                             }
                             if matches!(&edit, E::CycleClockFormat | E::SetClockFormat(_)) {
@@ -2709,8 +2745,10 @@ pub fn run_with_popup(
                             .find(|(_, b)| b.window.hwnd as usize == hwnd)
                         {
                             if let Some(m) = model.monitors.iter().find(|m| &m.name == name) {
+                                let bar_h =
+                                    crate::settings_ui::BarSettings::load(&root).bar_height();
                                 let mut bounds = m.bounds;
-                                bounds.h = (40. * m.scale).round_ties_even() as i32;
+                                bounds.h = (bar_h * m.scale).round_ties_even() as i32;
                                 bar.position(bounds, shadow, hidden);
                             }
                         }

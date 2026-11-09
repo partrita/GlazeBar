@@ -332,7 +332,7 @@ pub fn paint(c: &mut Canvas, p: &Preview) {
                 375.,
                 &[("PS C:\\Users\\Dev> ", 6), ("cargo check", 15)],
             );
-            line(c, "   Compiling glazebar-native v0.0.9", a[2], 30., 400.);
+            line(c, "   Compiling glazebar-native v0.0.11", a[2], 30., 400.);
             line(
                 c,
                 "    Finished dev [unoptimized + debuginfo] target(s)",

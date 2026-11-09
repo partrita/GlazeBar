@@ -1,4 +1,4 @@
-GlazeBar + GlazeWM 커뮤니티 번들 0.0.9
+GlazeBar + GlazeWM 커뮤니티 번들 0.0.11
 
 Windows 11 x64 / ARM64용입니다. PC 아키텍처에 맞는 패키지를 사용하세요.
 GlazeBar와 수정 GlazeWM 3.10.1-glazebar.2가 포함됩니다.

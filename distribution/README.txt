@@ -1,4 +1,4 @@
-GlazeBar + GlazeWM community bundle 0.0.9
+GlazeBar + GlazeWM community bundle 0.0.11
 
 For Windows 11 x64 / ARM64. Choose the package matching your Windows architecture.
 Includes native Rust GlazeBar and modified GlazeWM 3.10.1-glazebar.2.

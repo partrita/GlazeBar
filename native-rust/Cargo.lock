@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "glazebar-native"
-version = "0.0.9"
+version = "0.0.11"
 dependencies = [
  "anyhow",
  "base64",

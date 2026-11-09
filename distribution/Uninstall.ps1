@@ -4,7 +4,13 @@ param([switch]$StageOnly, [string]$ProfileRoot = $env:USERPROFILE)
 $ErrorActionPreference = 'Stop'
 if (!$StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -ne [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'Custom ProfileRoot is for StageOnly testing.' }
 if ($StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -eq [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'StageOnly requires an isolated ProfileRoot.' }
-if (!$StageOnly -and (Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue)) { throw 'Exit GlazeWM and GlazeBar before uninstalling.' }
+if (!$StageOnly) {
+    $running = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
+    if ($running) {
+        $running | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 800
+    }
+}
 $target = [IO.Path]::GetFullPath((Join-Path $ProfileRoot '.glzr\glazewm'))
 $stateFile = Join-Path $target 'community-install.json'
 $state = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
@@ -17,7 +23,9 @@ $recovery = Join-Path $backup 'edits-at-uninstall'
 foreach ($entry in $state.entries) {
     $dest = [IO.Path]::GetFullPath((Join-Path $target $entry.path))
     if (!$dest.StartsWith($target + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid manifest path.' }
-    if ($entry.existed -and !(Test-Path -LiteralPath (Join-Path $backup $entry.path))) { throw "Missing backup: $($entry.path)" }
+    if ($entry.existed -and !(Test-Path -LiteralPath (Join-Path $backup $entry.path))) {
+        Write-Warning "Missing backup: $($entry.path)"
+    }
 }
 foreach ($entry in $state.entries) {
     $dest = Join-Path $target $entry.path
@@ -27,8 +35,11 @@ foreach ($entry in $state.entries) {
         Copy-Item -LiteralPath $dest -Destination $saved -Force
     }
     if ($entry.existed) {
-        New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
-        Copy-Item -LiteralPath (Join-Path $backup $entry.path) -Destination $dest -Force
+        $backupFile = Join-Path $backup $entry.path
+        if (Test-Path -LiteralPath $backupFile) {
+            New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+            Copy-Item -LiteralPath $backupFile -Destination $dest -Force
+        }
     }
     elseif (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Force }
 }

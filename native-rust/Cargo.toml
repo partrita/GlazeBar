@@ -1,6 +1,6 @@
 [package]
 name = "glazebar-native"
-version = "0.0.9"
+version = "0.0.11"
 authors = ["deepthough"]
 edition = "2024"
 rust-version = "1.93"

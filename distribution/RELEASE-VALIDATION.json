@@ -1,6 +1,6 @@
 {
-    "version":  "0.0.9",
-    "date":  "2026-11-06",
+    "version":  "0.0.11",
+    "date":  "2026-11-09",
     "rust":  "1.93.0",
     "tests":  {
                   "ignored":  1,
@@ -29,13 +29,13 @@
                 },
     "builds":  {
                    "x64":  {
-                               "productVersion":  "0.0.9",
+                               "productVersion":  "0.0.11",
                                "target":  "x86_64-pc-windows-msvc",
                                "peMachine":  "0x8664"
                            },
                    "arm64":  {
                                  "runtimeTested":  false,
-                                 "productVersion":  "0.0.9",
+                                 "productVersion":  "0.0.11",
                                  "target":  "aarch64-pc-windows-msvc",
                                  "peMachine":  "0xAA64"
                              }

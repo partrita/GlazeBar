@@ -19,7 +19,7 @@
 #endif
 
 #ifndef AppVersion
-  #define AppVersion "0.0.9"
+  #define AppVersion "0.0.11"
 #endif
 
 [Setup]
@@ -86,6 +86,11 @@ Name: "{group}\Installation and licenses"; Filename: "{app}\Setup-Info.txt"
 Name: "{group}\Uninstall GlazeBar bundle"; Filename: "{uninstallexe}"
 #endif
 
+[Run]
+#if TestProfile == ""
+Filename: "{code:GetProfileRoot}\\.glzr\\glazewm\\wm\\glazewm.exe"; Parameters: "start"; WorkingDir: "{code:GetProfileRoot}\\.glzr\\glazewm\\wm"; Description: "{cm:LaunchProgram,GlazeBar + GlazeWM}"; Flags: nowait postinstall skipifsilent
+#endif
+
 [Code]
 var
   StagingRoot: String;
@@ -141,12 +146,53 @@ begin
   Result := Result and (Code = 0);
 end;
 
+function UnquoteStr(const S: String): String;
+begin
+  if (Length(S) >= 2) and (S[1] = '"') and (S[Length(S)] = '"') then
+    Result := Copy(S, 2, Length(S) - 2)
+  else
+    Result := S;
+end;
+
+function GetPreviousUninstallString: String;
+var
+  S: String;
+begin
+  Result := '';
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductId}_is1', 'UninstallString', S) then
+    Result := S;
+end;
+
+function UninstallPreviousVersion: Boolean;
+var
+  UninstStr, UninstExe: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  UninstStr := GetPreviousUninstallString;
+  if UninstStr <> '' then begin
+    UninstExe := UnquoteStr(UninstStr);
+    if FileExists(UninstExe) then begin
+      Log('Previous installation detected: ' + UninstExe + '. Uninstalling previous version...');
+      if Exec(UninstExe, '/SILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then begin
+        Result := (ResultCode = 0);
+        Log('Previous version uninstaller finished with code: ' + IntToStr(ResultCode));
+      end else begin
+        Log('Failed to execute previous version uninstaller.');
+        Result := False;
+      end;
+    end;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
   if PayloadInstalled then exit;
   ExtractTemporaryFiles('*');
   StagingRoot := ExpandConstant('{tmp}\') + '{app}';
+  RunBridgeAt(StagingRoot, 'StopProcesses');
+  UninstallPreviousVersion;
   if not RunBridgeAt(StagingRoot, 'Install') then
     Result := 'Installation failed. See the GlazeBarSetup install.log for details.'
   else

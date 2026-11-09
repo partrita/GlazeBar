@@ -68,14 +68,16 @@ pub const CLOCK_FORMATS: [(&str, &str); 5] = [
     ("ISO", "YYYY-MM-DD HH:MM"),
 ];
 
-pub const OPACITY_STEPS: [(&str, u8); 6] = [
-    ("100% (불투명)", 100),
-    ("80%", 80),
-    ("60%", 60),
-    ("40%", 40),
-    ("20%", 20),
-    ("0% (투명)", 0),
+pub const OPACITY_STEPS: [(&str, u8); 2] = [("불투명", 100), ("투명", 0)];
+
+pub const BAR_HEIGHT_STEPS: [(&str, f64); 5] = [
+    ("32px (슬림)", 32.),
+    ("36px (조밀)", 36.),
+    ("40px (기본)", 40.),
+    ("44px (넉넉)", 44.),
+    ("48px (큼직)", 48.),
 ];
+pub const DEFAULT_BAR_HEIGHT_IDX: usize = 2;
 
 pub const TOPBAR_WIDGET_IDS: [&str; 11] = [
     "weather",
@@ -117,6 +119,9 @@ fn default_targets() -> [bool; 16] {
 }
 fn default_gap_idx() -> usize {
     2
+}
+fn default_bar_height_idx() -> usize {
+    DEFAULT_BAR_HEIGHT_IDX
 }
 
 #[allow(dead_code)]
@@ -164,6 +169,8 @@ pub struct BarSettings {
     pub clock_format_idx: usize,
     #[serde(default)]
     pub opacity_idx: usize,
+    #[serde(default = "default_bar_height_idx")]
+    pub bar_height_idx: usize,
     #[serde(default = "default_true")]
     pub auto_split: bool,
     #[serde(default)]
@@ -199,6 +206,7 @@ impl Default for BarSettings {
             weather_city: 0,
             clock_format_idx: 0,
             opacity_idx: 0,
+            bar_height_idx: DEFAULT_BAR_HEIGHT_IDX,
             auto_split: true,
             terminal_idx: 0,
             browser_idx: 0,
@@ -231,12 +239,14 @@ pub enum Edit {
     SetCity(usize),
     SetClockFormat(usize),
     SetOpacity(usize),
+    SetBarHeight(usize),
     SetTerminal(usize),
     SetBrowser(usize),
     SetAutoSplit(bool),
     CycleCity,
     CycleClockFormat,
     CycleOpacity,
+    CycleBarHeight,
     ToggleAutoSplit,
     CycleTerminal,
     CycleBrowser,
@@ -294,6 +304,19 @@ impl BarSettings {
         order
     }
 
+    pub fn bar_height(&self) -> f64 {
+        BAR_HEIGHT_STEPS
+            .get(self.bar_height_idx)
+            .map(|s| s.1)
+            .unwrap_or(40.)
+    }
+
+    pub fn is_transparent(&self) -> bool {
+        OPACITY_STEPS
+            .get(self.opacity_idx)
+            .is_some_and(|s| s.1 == 0)
+    }
+
     pub fn load(root: &Path) -> Self {
         let path = root.join("theme-state/glazebar-settings.json");
         let mut s: Self = std::fs::read(&path)
@@ -306,6 +329,9 @@ impl BarSettings {
             .clock_format_idx
             .min(CLOCK_FORMATS.len().saturating_sub(1));
         s.opacity_idx = s.opacity_idx.min(OPACITY_STEPS.len().saturating_sub(1));
+        s.bar_height_idx = s
+            .bar_height_idx
+            .min(BAR_HEIGHT_STEPS.len().saturating_sub(1));
         s.terminal_idx = s.terminal_idx.min(TERMINALS.len().saturating_sub(1));
         s.browser_idx = s.browser_idx.min(BROWSERS.len().saturating_sub(1));
         s.gap_idx = s.gap_idx.min(GAPS.len().saturating_sub(1));
@@ -418,6 +444,15 @@ impl BarSettings {
                 self.status = format!("✓ 상단 바 투명도: {}", OPACITY_STEPS[self.opacity_idx].0);
                 return;
             }
+            Edit::SetBarHeight(idx) => {
+                self.bar_height_idx = (*idx).min(BAR_HEIGHT_STEPS.len().saturating_sub(1));
+                self.open_dropdown = None;
+                self.status = format!(
+                    "✓ 상단 바 높이: {}",
+                    BAR_HEIGHT_STEPS[self.bar_height_idx].0
+                );
+                return;
+            }
             Edit::SetTerminal(idx) => {
                 self.terminal_idx = (*idx).min(TERMINALS.len().saturating_sub(1));
                 self.open_dropdown = None;
@@ -446,6 +481,9 @@ impl BarSettings {
                 self.clock_format_idx = (self.clock_format_idx + 1) % CLOCK_FORMATS.len()
             }
             Edit::CycleOpacity => self.opacity_idx = (self.opacity_idx + 1) % OPACITY_STEPS.len(),
+            Edit::CycleBarHeight => {
+                self.bar_height_idx = (self.bar_height_idx + 1) % BAR_HEIGHT_STEPS.len();
+            }
             Edit::ToggleAutoSplit => self.auto_split = !self.auto_split,
             Edit::CycleTerminal => self.terminal_idx = (self.terminal_idx + 1) % TERMINALS.len(),
             Edit::CycleBrowser => self.browser_idx = (self.browser_idx + 1) % BROWSERS.len(),
@@ -715,7 +753,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
     // -------------------------------------------------------------------------
     // Card 2: 상단 바 외형 · 시계 형식 · 날씨 지역 (드롭다운 없는 원클릭 세그먼트 바)
     // -------------------------------------------------------------------------
-    let sec2 = Rect::new(s(24.), s(190.), w - s(48.), s(156.));
+    let sec2 = Rect::new(s(24.), s(190.), w - s(48.), s(194.));
     c.round_rect(sec2, c.ui.surface, s(8.));
     c.text(
         "상단 바 외형 · 시계 형식 · 날씨 지역",
@@ -741,6 +779,21 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         hover,
     );
 
+    let height_opts: Vec<(&str, bool, Edit)> = BAR_HEIGHT_STEPS
+        .iter()
+        .enumerate()
+        .map(|(i, (label, _))| (*label, v.bar_height_idx == i, Edit::SetBarHeight(i)))
+        .collect();
+    draw_segmented_row(
+        c,
+        &mut hits,
+        "상단 바 높이",
+        s(264.),
+        w,
+        &height_opts,
+        hover,
+    );
+
     let clock_opts: Vec<(&str, bool, Edit)> = [
         ("전체 (년/월/일 시:분)", 0),
         ("시간만 (시:분)", 1),
@@ -755,7 +808,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         c,
         &mut hits,
         "시계 표시 형식",
-        s(264.),
+        s(302.),
         w,
         &clock_opts,
         hover,
@@ -770,7 +823,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         c,
         &mut hits,
         "날씨 측정 지역",
-        s(302.),
+        s(340.),
         w,
         &city_opts,
         hover,
@@ -779,11 +832,11 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
     // -------------------------------------------------------------------------
     // Card 3: 창 관리 및 단축키 기본 실행 프로그램
     // -------------------------------------------------------------------------
-    let sec3 = Rect::new(s(24.), s(356.), w - s(48.), s(156.));
+    let sec3 = Rect::new(s(24.), s(394.), w - s(48.), s(156.));
     c.round_rect(sec3, c.ui.surface, s(8.));
     c.text(
         "창 관리 및 단축키 기본 실행 프로그램",
-        Rect::new(s(38.), s(364.), s(360.), s(22.)),
+        Rect::new(s(38.), s(402.), s(360.), s(22.)),
         c.ui.accent,
         12.5,
         true,
@@ -806,7 +859,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         c,
         &mut hits,
         "자동 분할 (Auto-Split)",
-        s(392.),
+        s(430.),
         w,
         &split_opts,
         hover,
@@ -821,7 +874,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         c,
         &mut hits,
         "터미널 (Alt+Enter)",
-        s(430.),
+        s(468.),
         w,
         &term_opts,
         hover,
@@ -836,7 +889,7 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         c,
         &mut hits,
         "브라우저 (Alt+Shift+Enter)",
-        s(468.),
+        s(506.),
         w,
         &brow_opts,
         hover,
@@ -967,6 +1020,7 @@ mod tests {
         s.apply_edit(&Edit::CycleCity);
         s.apply_edit(&Edit::CycleClockFormat);
         s.apply_edit(&Edit::CycleOpacity);
+        s.apply_edit(&Edit::CycleBarHeight);
         s.apply_edit(&Edit::CycleTerminal);
         s.apply_edit(&Edit::ToggleAutoSplit);
         s.apply_edit(&Edit::ToggleTarget(4));
@@ -976,6 +1030,10 @@ mod tests {
         assert_eq!(loaded.weather_city, 1);
         assert_eq!(loaded.clock_format_idx, 1);
         assert_eq!(loaded.opacity_idx, 1);
+        assert_eq!(
+            loaded.bar_height_idx,
+            (DEFAULT_BAR_HEIGHT_IDX + 1) % BAR_HEIGHT_STEPS.len()
+        );
         assert_eq!(loaded.terminal_idx, 1);
         assert!(!loaded.auto_split);
         assert!(!loaded.targets[4]);

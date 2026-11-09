@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 param(
-    [Parameter(Mandatory)][ValidateSet('Install','Uninstall','CheckUninstall')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('Install','Uninstall','CheckUninstall','StopProcesses')][string]$Action,
     [Parameter(Mandatory)][string]$Bundle,
     [switch]$AutoStart,
     [string]$TestProfile
@@ -15,12 +15,33 @@ New-Item -ItemType Directory -Force $logRoot | Out-Null
 $logAction = if ($Action -eq 'CheckUninstall') { 'uninstall' } else { $Action.ToLower() }
 $log = Join-Path $logRoot ($logAction + '.log')
 try {
+    if ($Action -eq 'StopProcesses') {
+        if (!$TestProfile) {
+            $procs = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
+            if ($procs) {
+                $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 800
+            }
+        }
+        exit 0
+    }
     if ($Action -eq 'CheckUninstall') {
-        if (!$TestProfile -and (Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue)) { throw 'Close GlazeWM and GlazeBar before uninstalling.' }
+        if (!$TestProfile) {
+            $procs = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
+            if ($procs) {
+                $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 800
+            }
+        }
         $profile = if ($TestProfile) { $TestProfile } else { $env:USERPROFILE }
-        $state = Get-Content -LiteralPath (Join-Path $profile '.glzr/glazewm/community-install.json') -Raw | ConvertFrom-Json
-        foreach ($entry in $state.entries) {
-            if ($entry.existed -and !(Test-Path -LiteralPath (Join-Path $state.backup $entry.path))) { throw "Backup missing: $($entry.path)" }
+        $statePath = Join-Path $profile '.glzr/glazewm/community-install.json'
+        if (Test-Path -LiteralPath $statePath) {
+            $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+            foreach ($entry in $state.entries) {
+                if ($entry.existed -and !(Test-Path -LiteralPath (Join-Path $state.backup $entry.path))) {
+                    Write-Warning "Backup missing: $($entry.path)"
+                }
+            }
         }
         exit 0
     }
