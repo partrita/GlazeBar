@@ -15,7 +15,7 @@ New-Item -ItemType Directory -Force $logRoot | Out-Null
 $logAction = if ($Action -eq 'CheckUninstall') { 'uninstall' } else { $Action.ToLower() }
 $log = Join-Path $logRoot ($logAction + '.log')
 try {
-    if ($Action -eq 'StopProcesses' -or $Action -eq 'CheckUninstall') {
+    if ($Action -eq 'StopProcesses') {
         if (!$TestProfile) {
             & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
             for ($attempt = 0; $attempt -lt 3; $attempt++) {
@@ -28,8 +28,21 @@ try {
                 }
             }
         }
-        if ($Action -eq 'StopProcesses') { exit 0 }
+        exit 0
     }
+    if ($Action -eq 'CheckUninstall') {
+        if (!$TestProfile) {
+            & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
+            for ($attempt = 0; $attempt -lt 3; $attempt++) {
+                $procs = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+                if ($procs) {
+                    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Milliseconds 400
+                } else {
+                    break
+                }
+            }
+        }
         $profile = if ($TestProfile) { $TestProfile } else { $env:USERPROFILE }
         $statePath = Join-Path $profile '.glzr/glazewm/community-install.json'
         if (Test-Path -LiteralPath $statePath) {

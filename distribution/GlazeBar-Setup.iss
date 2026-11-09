@@ -127,12 +127,38 @@ begin
   Result := True;
 end;
 
+function GetPowershellExe: String;
+begin
+  Result := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
+  if not FileExists(Result) then
+    Result := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+end;
+
+function ReadLogContent(LogFile: String): String;
+var
+  Lines: TArrayOfString;
+  I, StartIdx: Integer;
+begin
+  Result := '';
+  if FileExists(LogFile) then begin
+    if LoadStringsFromFile(LogFile, Lines) then begin
+      StartIdx := 0;
+      if GetArrayLength(Lines) > 10 then
+        StartIdx := GetArrayLength(Lines) - 10;
+      for I := StartIdx to GetArrayLength(Lines) - 1 do begin
+        if Result <> '' then Result := Result + #13#10;
+        Result := Result + Lines[I];
+      end;
+    end;
+  end;
+end;
+
 function RunBridgeAt(BasePath, Action: String): Boolean;
 var
   Code: Integer;
   Args: String;
 begin
-  Args := '-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' +
+  Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     BasePath + '\Setup-Bridge.ps1' + '" -Action ' + Action +
     ' -Bundle "' + BasePath + '\bundle' + '"';
   if Action = 'Install' then
@@ -141,7 +167,7 @@ begin
 #if TestProfile != ""
   Args := Args + ' -TestProfile "{#TestProfile}"';
 #endif
-  Result := Exec(ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe'),
+  Result := Exec(GetPowershellExe,
     Args, BasePath, SW_HIDE, ewWaitUntilTerminated, Code);
   Result := Result and (Code = 0);
 end;
@@ -186,6 +212,8 @@ begin
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  InstallLog, LogSummary: String;
 begin
   Result := '';
   if PayloadInstalled then exit;
@@ -193,9 +221,15 @@ begin
   StagingRoot := ExpandConstant('{tmp}\') + '{app}';
   RunBridgeAt(StagingRoot, 'StopProcesses');
   UninstallPreviousVersion;
-  if not RunBridgeAt(StagingRoot, 'Install') then
-    Result := 'Installation failed. See the GlazeBarSetup install.log for details.'
-  else
+  if not RunBridgeAt(StagingRoot, 'Install') then begin
+    InstallLog := ExpandConstant('{localappdata}\GlazeBarSetup\install.log');
+    LogSummary := ReadLogContent(InstallLog);
+    if LogSummary <> '' then
+      Result := 'Installation failed:' + #13#10#13#10 + LogSummary
+    else
+      Result := 'Installation failed. PowerShell returned an error before logging could begin.' + #13#10 +
+                'Path: ' + StagingRoot + '\Setup-Bridge.ps1';
+  end else
     PayloadInstalled := True;
 end;
 
