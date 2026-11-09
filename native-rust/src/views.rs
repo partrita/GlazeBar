@@ -216,8 +216,6 @@ pub fn bar_with_settings(
                     r.h.saturating_sub(2),
                 );
                 c.frame(inner, 0x00FFFFFF);
-            } else {
-                c.frame(r, 0x00888888);
             }
             c.text(&ws.display, r, 0x00FFFFFF, 12.5, true, 1);
         } else {
