@@ -4,17 +4,25 @@ param([switch]$StageOnly, [string]$ProfileRoot = $env:USERPROFILE)
 $ErrorActionPreference = 'Stop'
 if (!$StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -ne [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'Custom ProfileRoot is for StageOnly testing.' }
 if ($StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -eq [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'StageOnly requires an isolated ProfileRoot.' }
-if (!$StageOnly) {
-    & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-    for ($attempt = 0; $attempt -lt 3; $attempt++) {
-        $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
-        if ($running) {
-            $running | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 400
-        } else {
-            break
+function Stop-GlazeBarProcesses {
+    $procNames = @('glazewm', 'glazewm-watcher', 'GlazeBar', 'GlazeTheme', 'WorkspaceToggle')
+    $running = Get-Process -Name $procNames -ErrorAction SilentlyContinue
+    if ($running) {
+        cmd.exe /c 'taskkill /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe >nul 2>&1'
+        for ($attempt = 0; $attempt -lt 3; $attempt++) {
+            $running = Get-Process -Name $procNames -ErrorAction SilentlyContinue
+            if ($running) {
+                $running | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 400
+            } else {
+                break
+            }
         }
     }
+}
+
+if (!$StageOnly) {
+    Stop-GlazeBarProcesses
 }
 function Safe-RemoveFile([string]$path) {
     if (Test-Path -LiteralPath $path) {
@@ -24,9 +32,7 @@ function Safe-RemoveFile([string]$path) {
         } catch {}
 
         if (!$StageOnly) {
-            & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-            Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 400
+            Stop-GlazeBarProcesses
         }
 
         try {
@@ -52,9 +58,7 @@ function Safe-CopyFile([string]$src, [string]$dst) {
     } catch {}
 
     if (!$StageOnly) {
-        & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-        Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 400
+        Stop-GlazeBarProcesses
     }
 
     try {

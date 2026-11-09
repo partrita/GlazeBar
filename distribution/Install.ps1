@@ -9,16 +9,13 @@ foreach ($item in $manifest.files) {
     $file = Join-Path $PSScriptRoot $item.path
     if (!(Test-Path -LiteralPath $file) -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $item.sha256) { throw "Integrity check failed: $($item.path)" }
 }
-if (!$StageOnly) {
-    $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
-    $expected = if ($manifest.architecture -eq 'arm64') { 'ARM64' } else { 'AMD64' }
-    if ($arch -ne $expected) { throw "Use the package for your Windows architecture ($arch)." }
-    & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-    $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+function Stop-GlazeBarProcesses {
+    $procNames = @('glazewm', 'glazewm-watcher', 'GlazeBar', 'GlazeTheme', 'WorkspaceToggle')
+    $running = Get-Process -Name $procNames -ErrorAction SilentlyContinue
     if ($running) {
-        Write-Output "Stopping running GlazeWM and GlazeBar processes for update..."
+        cmd.exe /c 'taskkill /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe >nul 2>&1'
         for ($attempt = 0; $attempt -lt 3; $attempt++) {
-            $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+            $running = Get-Process -Name $procNames -ErrorAction SilentlyContinue
             if ($running) {
                 $running | Stop-Process -Force -ErrorAction SilentlyContinue
                 Start-Sleep -Milliseconds 400
@@ -27,6 +24,13 @@ if (!$StageOnly) {
             }
         }
     }
+}
+
+if (!$StageOnly) {
+    $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+    $expected = if ($manifest.architecture -eq 'arm64') { 'ARM64' } else { 'AMD64' }
+    if ($arch -ne $expected) { throw "Use the package for your Windows architecture ($arch)." }
+    Stop-GlazeBarProcesses
     if (![Environment]::Is64BitProcess) { throw 'Run this installer from 64-bit PowerShell.' }
     # The official GlazeWM MSI needs VC runtime even though GlazeBar links it statically.
     if (!(Test-Path -LiteralPath (Join-Path ([Environment]::SystemDirectory) 'vcruntime140.dll'))) {
@@ -71,9 +75,7 @@ function Safe-CopyFile([string]$src, [string]$dst) {
     } catch {}
 
     if (!$StageOnly) {
-        & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-        Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 400
+        Stop-GlazeBarProcesses
     }
 
     try {
@@ -97,9 +99,7 @@ function Safe-RemoveFile([string]$path) {
         } catch {}
 
         if (!$StageOnly) {
-            & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
-            Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 400
+            Stop-GlazeBarProcesses
         }
 
         try {
@@ -197,7 +197,9 @@ try {
         $cli = Join-Path $env:ProgramFiles 'glzr.io\GlazeWM\cli\glazewm.exe'
         if (Test-Path -LiteralPath $cli) {
             $version = & $cli --version
-            if ($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'glazewm 3.10.1') { throw 'This bundle requires GlazeWM 3.10.1. Existing installation was not changed.' }
+            if ($version -and $version.Trim() -ne 'glazewm 3.10.1') {
+                Write-Warning "Existing GlazeWM version ($($version.Trim())) detected. GlazeBar is tested with 3.10.1."
+            }
         } else {
             $msi = Join-Path $PSScriptRoot $manifest.glazewmMsi
             $process = Start-Process msiexec.exe -ArgumentList @('/i', ('"' + $msi + '"'), '/passive', '/norestart') -Wait -PassThru -WindowStyle Hidden
