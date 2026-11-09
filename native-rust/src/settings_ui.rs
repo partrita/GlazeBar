@@ -185,6 +185,8 @@ pub struct BarSettings {
     pub status: String,
     #[serde(skip)]
     pub open_dropdown: Option<SettingsDropdown>,
+    #[serde(skip)]
+    pub scroll_offset: i32,
 }
 
 impl Default for BarSettings {
@@ -214,6 +216,7 @@ impl Default for BarSettings {
             targets: [true; 16],
             status: String::new(),
             open_dropdown: None,
+            scroll_offset: 0,
         }
     }
 }
@@ -499,6 +502,18 @@ impl BarSettings {
         }
         self.status.clear();
     }
+
+    pub fn scroll(&mut self, delta: i32, scale: f64, viewport_h: i32) {
+        let s = |n: f64| (n * scale).round_ties_even() as i32;
+        let total = s(566.);
+        let visible = viewport_h - s(54.);
+        if total > visible {
+            let max_offset = total - visible;
+            self.scroll_offset = (self.scroll_offset + delta).clamp(0, max_offset);
+        } else {
+            self.scroll_offset = 0;
+        }
+    }
 }
 
 fn draw_widget_card(
@@ -682,218 +697,252 @@ pub fn paint(c: &mut Canvas, v: &BarSettings, hover: Option<(i32, i32)>, chrome:
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Card 1: 상단 바 위젯 표시 및 배치 순서 (원클릭 토글 + ◀ ▶ 순서 변경)
-    // -------------------------------------------------------------------------
-    let sec1 = Rect::new(s(24.), s(14.), w - s(48.), s(166.));
-    c.round_rect(sec1, c.ui.surface, s(8.));
-    c.text(
-        "상단 바 위젯 표시 및 배치 순서",
-        Rect::new(s(38.), s(22.), s(240.), s(24.)),
-        c.ui.accent,
-        12.5,
-        true,
-        0,
-    );
-    c.text(
-        "카드를 클릭해 즉시 켜거나 끄고, 우측 ◀ ▶ 버튼으로 상단 바 표시 순서를 조정하세요 (오른쪽 끝부터 1번)",
-        Rect::new(s(270.), s(22.), w - s(440.), s(24.)),
-        c.ui.muted,
-        11.,
-        false,
-        0,
-    );
+    let bottom_y = h - s(54.);
+    let offset_y = v.scroll_offset;
 
-    let reset_order_r = Rect::new(w - s(164.), s(21.), s(126.), s(26.));
-    views::button(
-        c,
-        &mut hits,
-        "순서 초기화 ↺",
-        reset_order_r,
-        false,
-        hover.is_some_and(|(x, y)| reset_order_r.contains(x, y)),
-        true,
-        Action::Settings(Edit::ResetWidgetOrder),
-    );
-
-    let order = v.normalized_widget_order();
-    let grid_w = w - s(76.);
-    let col_gap = s(10.);
-    let col_w = (grid_w - col_gap * 2) / 3;
-    let row_h = s(34.);
-    let row_gap = s(8.);
-
-    for (i, widget_id) in order.iter().enumerate() {
-        let row = i / 3;
-        let col = i % 3;
-        let item_r = Rect::new(
-            s(38.) + col as i32 * (col_w + col_gap),
-            s(54.) + row as i32 * (row_h + row_gap),
-            col_w,
-            row_h,
+    unsafe {
+        let saved = windows_sys::Win32::Graphics::Gdi::SaveDC(c.dc);
+        windows_sys::Win32::Graphics::Gdi::IntersectClipRect(
+            c.dc,
+            c.origin.0,
+            c.origin.1,
+            c.origin.0 + w,
+            c.origin.1 + bottom_y,
         );
-        let is_visible = v.is_widget_visible(widget_id);
-        let name_idx = TOPBAR_WIDGET_IDS
-            .iter()
-            .position(|&id| id == widget_id)
-            .unwrap_or(0);
-        let display_name = TOPBAR_WIDGET_NAMES[name_idx];
-        draw_widget_card(
+
+        // -------------------------------------------------------------------------
+        // Card 1: 상단 바 위젯 표시 및 배치 순서 (원클릭 토글 + ◀ ▶ 순서 변경)
+        // -------------------------------------------------------------------------
+        let sec1 = Rect::new(s(24.), s(14.) - offset_y, w - s(48.), s(166.));
+        c.round_rect(sec1, c.ui.surface, s(8.));
+        c.text(
+            "상단 바 위젯 표시 및 배치 순서",
+            Rect::new(s(38.), s(22.) - offset_y, s(240.), s(24.)),
+            c.ui.accent,
+            12.5,
+            true,
+            0,
+        );
+        c.text(
+            "카드를 클릭해 즉시 켜거나 끄고, 우측 ◀ ▶ 버튼으로 상단 바 표시 순서를 조정하세요 (오른쪽 끝부터 1번)",
+            Rect::new(s(270.), s(22.) - offset_y, w - s(440.), s(24.)),
+            c.ui.muted,
+            11.,
+            false,
+            0,
+        );
+
+        let reset_order_r = Rect::new(w - s(164.), s(21.) - offset_y, s(126.), s(26.));
+        views::button(
             c,
             &mut hits,
-            item_r,
-            i,
-            display_name,
-            widget_id,
-            is_visible,
+            "순서 초기화 ↺",
+            reset_order_r,
+            false,
+            hover.is_some_and(|(x, y)| reset_order_r.contains(x, y)),
+            true,
+            Action::Settings(Edit::ResetWidgetOrder),
+        );
+
+        let order = v.normalized_widget_order();
+        let grid_w = w - s(76.);
+        let col_gap = s(10.);
+        let col_w = (grid_w - col_gap * 2) / 3;
+        let row_h = s(34.);
+        let row_gap = s(8.);
+
+        for (i, widget_id) in order.iter().enumerate() {
+            let row = i / 3;
+            let col = i % 3;
+            let item_r = Rect::new(
+                s(38.) + col as i32 * (col_w + col_gap),
+                s(54.) - offset_y + row as i32 * (row_h + row_gap),
+                col_w,
+                row_h,
+            );
+            let is_visible = v.is_widget_visible(widget_id);
+            let name_idx = TOPBAR_WIDGET_IDS
+                .iter()
+                .position(|&id| id == widget_id)
+                .unwrap_or(0);
+            let display_name = TOPBAR_WIDGET_NAMES[name_idx];
+            draw_widget_card(
+                c,
+                &mut hits,
+                item_r,
+                i,
+                display_name,
+                widget_id,
+                is_visible,
+                hover,
+            );
+        }
+
+        // -------------------------------------------------------------------------
+        // Card 2: 상단 바 외형 · 시계 형식 · 날씨 지역 (드롭다운 없는 원클릭 세그먼트 바)
+        // -------------------------------------------------------------------------
+        let sec2 = Rect::new(s(24.), s(190.) - offset_y, w - s(48.), s(194.));
+        c.round_rect(sec2, c.ui.surface, s(8.));
+        c.text(
+            "상단 바 외형 · 시계 형식 · 날씨 지역",
+            Rect::new(s(38.), s(198.) - offset_y, s(340.), s(22.)),
+            c.ui.accent,
+            12.5,
+            true,
+            0,
+        );
+
+        let opacity_opts: Vec<(&str, bool, Edit)> = OPACITY_STEPS
+            .iter()
+            .enumerate()
+            .map(|(i, (label, _))| (*label, v.opacity_idx == i, Edit::SetOpacity(i)))
+            .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "상단 바 투명도",
+            s(226.) - offset_y,
+            w,
+            &opacity_opts,
             hover,
         );
+
+        let height_opts: Vec<(&str, bool, Edit)> = BAR_HEIGHT_STEPS
+            .iter()
+            .enumerate()
+            .map(|(i, (label, _))| (*label, v.bar_height_idx == i, Edit::SetBarHeight(i)))
+            .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "상단 바 높이",
+            s(264.) - offset_y,
+            w,
+            &height_opts,
+            hover,
+        );
+
+        let clock_opts: Vec<(&str, bool, Edit)> = [
+            ("전체 (년/월/일 시:분)", 0),
+            ("시간만 (시:분)", 1),
+            ("날짜만 (년/월/일)", 2),
+            ("간략형 (월/일 시:분)", 3),
+            ("ISO (YYYY-MM-DD)", 4),
+        ]
+        .into_iter()
+        .map(|(label, i)| (label, v.clock_format_idx == i, Edit::SetClockFormat(i)))
+        .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "시계 표시 형식",
+            s(302.) - offset_y,
+            w,
+            &clock_opts,
+            hover,
+        );
+
+        let city_opts: Vec<(&str, bool, Edit)> = CITIES
+            .iter()
+            .enumerate()
+            .map(|(i, city)| (city.name, v.weather_city == i, Edit::SetCity(i)))
+            .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "날씨 측정 지역",
+            s(340.) - offset_y,
+            w,
+            &city_opts,
+            hover,
+        );
+
+        // -------------------------------------------------------------------------
+        // Card 3: 창 관리 및 단축키 기본 실행 프로그램
+        // -------------------------------------------------------------------------
+        let sec3 = Rect::new(s(24.), s(394.) - offset_y, w - s(48.), s(156.));
+        c.round_rect(sec3, c.ui.surface, s(8.));
+        c.text(
+            "창 관리 및 단축키 기본 실행 프로그램",
+            Rect::new(s(38.), s(402.) - offset_y, s(360.), s(22.)),
+            c.ui.accent,
+            12.5,
+            true,
+            0,
+        );
+
+        let split_opts = [
+            (
+                "켜짐 · 창 비율에 따라 가로/세로 자동 분할",
+                v.auto_split,
+                Edit::SetAutoSplit(true),
+            ),
+            (
+                "꺼짐 · 수동 분할 방향만 유지",
+                !v.auto_split,
+                Edit::SetAutoSplit(false),
+            ),
+        ];
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "자동 분할 (Auto-Split)",
+            s(430.) - offset_y,
+            w,
+            &split_opts,
+            hover,
+        );
+
+        let term_opts: Vec<(&str, bool, Edit)> = TERMINALS
+            .iter()
+            .enumerate()
+            .map(|(i, (label, _))| (*label, v.terminal_idx == i, Edit::SetTerminal(i)))
+            .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "터미널 (Alt+Enter)",
+            s(468.) - offset_y,
+            w,
+            &term_opts,
+            hover,
+        );
+
+        let brow_opts: Vec<(&str, bool, Edit)> = BROWSERS
+            .iter()
+            .enumerate()
+            .map(|(i, (label, _))| (*label, v.browser_idx == i, Edit::SetBrowser(i)))
+            .collect();
+        draw_segmented_row(
+            c,
+            &mut hits,
+            "브라우저 (Alt+Shift+Enter)",
+            s(506.) - offset_y,
+            w,
+            &brow_opts,
+            hover,
+        );
+
+        windows_sys::Win32::Graphics::Gdi::RestoreDC(c.dc, saved);
     }
 
-    // -------------------------------------------------------------------------
-    // Card 2: 상단 바 외형 · 시계 형식 · 날씨 지역 (드롭다운 없는 원클릭 세그먼트 바)
-    // -------------------------------------------------------------------------
-    let sec2 = Rect::new(s(24.), s(190.), w - s(48.), s(194.));
-    c.round_rect(sec2, c.ui.surface, s(8.));
-    c.text(
-        "상단 바 외형 · 시계 형식 · 날씨 지역",
-        Rect::new(s(38.), s(198.), s(340.), s(22.)),
-        c.ui.accent,
-        12.5,
-        true,
-        0,
-    );
+    // Filter out hits that are scrolled outside the viewport
+    hits.retain(|hit| hit.rect.y + hit.rect.h > 0 && hit.rect.y < bottom_y);
 
-    let opacity_opts: Vec<(&str, bool, Edit)> = OPACITY_STEPS
-        .iter()
-        .enumerate()
-        .map(|(i, (label, _))| (*label, v.opacity_idx == i, Edit::SetOpacity(i)))
-        .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "상단 바 투명도",
-        s(226.),
-        w,
-        &opacity_opts,
-        hover,
-    );
-
-    let height_opts: Vec<(&str, bool, Edit)> = BAR_HEIGHT_STEPS
-        .iter()
-        .enumerate()
-        .map(|(i, (label, _))| (*label, v.bar_height_idx == i, Edit::SetBarHeight(i)))
-        .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "상단 바 높이",
-        s(264.),
-        w,
-        &height_opts,
-        hover,
-    );
-
-    let clock_opts: Vec<(&str, bool, Edit)> = [
-        ("전체 (년/월/일 시:분)", 0),
-        ("시간만 (시:분)", 1),
-        ("날짜만 (년/월/일)", 2),
-        ("간략형 (월/일 시:분)", 3),
-        ("ISO (YYYY-MM-DD)", 4),
-    ]
-    .into_iter()
-    .map(|(label, i)| (label, v.clock_format_idx == i, Edit::SetClockFormat(i)))
-    .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "시계 표시 형식",
-        s(302.),
-        w,
-        &clock_opts,
-        hover,
-    );
-
-    let city_opts: Vec<(&str, bool, Edit)> = CITIES
-        .iter()
-        .enumerate()
-        .map(|(i, city)| (city.name, v.weather_city == i, Edit::SetCity(i)))
-        .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "날씨 측정 지역",
-        s(340.),
-        w,
-        &city_opts,
-        hover,
-    );
-
-    // -------------------------------------------------------------------------
-    // Card 3: 창 관리 및 단축키 기본 실행 프로그램
-    // -------------------------------------------------------------------------
-    let sec3 = Rect::new(s(24.), s(394.), w - s(48.), s(156.));
-    c.round_rect(sec3, c.ui.surface, s(8.));
-    c.text(
-        "창 관리 및 단축키 기본 실행 프로그램",
-        Rect::new(s(38.), s(402.), s(360.), s(22.)),
-        c.ui.accent,
-        12.5,
-        true,
-        0,
-    );
-
-    let split_opts = [
-        (
-            "켜짐 · 창 비율에 따라 가로/세로 자동 분할",
-            v.auto_split,
-            Edit::SetAutoSplit(true),
-        ),
-        (
-            "꺼짐 · 수동 분할 방향만 유지",
-            !v.auto_split,
-            Edit::SetAutoSplit(false),
-        ),
-    ];
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "자동 분할 (Auto-Split)",
-        s(430.),
-        w,
-        &split_opts,
-        hover,
-    );
-
-    let term_opts: Vec<(&str, bool, Edit)> = TERMINALS
-        .iter()
-        .enumerate()
-        .map(|(i, (label, _))| (*label, v.terminal_idx == i, Edit::SetTerminal(i)))
-        .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "터미널 (Alt+Enter)",
-        s(468.),
-        w,
-        &term_opts,
-        hover,
-    );
-
-    let brow_opts: Vec<(&str, bool, Edit)> = BROWSERS
-        .iter()
-        .enumerate()
-        .map(|(i, (label, _))| (*label, v.browser_idx == i, Edit::SetBrowser(i)))
-        .collect();
-    draw_segmented_row(
-        c,
-        &mut hits,
-        "브라우저 (Alt+Shift+Enter)",
-        s(506.),
-        w,
-        &brow_opts,
-        hover,
-    );
+    // Scrollbar indicator when content exceeds viewport
+    let total_h = s(566.);
+    if total_h > bottom_y {
+        let track = Rect::new(w - s(8.), s(14.), s(4.), bottom_y - s(20.));
+        c.fill(track, c.ui.surface);
+        let thumb_h = s(30.).max((bottom_y - s(20.)) * (bottom_y - s(20.)) / total_h);
+        let max_scroll = total_h - bottom_y;
+        let thumb_y = track.y + offset_y * (track.h - thumb_h) / max_scroll.max(1);
+        c.round_rect(
+            Rect::new(track.x, thumb_y, track.w, thumb_h),
+            c.ui.border,
+            s(2.),
+        );
+    }
 
     // -------------------------------------------------------------------------
     // Bottom Bar: 실시간 반영 상태 안내 및 유틸리티 버튼

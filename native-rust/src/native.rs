@@ -530,6 +530,27 @@ unsafe extern "system" fn wndproc(h: HWND, m: u32, wp: usize, lp: isize) -> isiz
                 }
                 return 0;
             }
+            WM_MOUSEWHEEL if matches!(&s.scene, Scene::Hub(v) if !v.is_theme_tab()) => {
+                let scale = s.scale;
+                let mut r = RECT::default();
+                GetClientRect(h, &mut r);
+                if let Scene::Hub(v) = &mut s.scene {
+                    let delta = if ((wp >> 16) as u16) as i16 > 0 {
+                        -60.
+                    } else {
+                        60.
+                    };
+                    let header_h = (crate::hub::HEADER_HEIGHT * scale).round_ties_even() as i32;
+                    let viewport_h = r.bottom - header_h;
+                    v.settings.scroll(
+                        (delta * scale).round_ties_even() as i32,
+                        scale,
+                        viewport_h,
+                    );
+                }
+                InvalidateRect(h, null(), 0);
+                return 0;
+            }
             WM_MOUSEWHEEL if matches!(s.scene, Scene::Sheet(_)) => {
                 let scale = s.scale;
                 let mut r = RECT::default();
