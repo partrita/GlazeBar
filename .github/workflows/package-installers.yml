@@ -59,8 +59,20 @@ jobs:
       - name: Update resource version to match target release
         shell: pwsh
         run: |
-          $rawTag = '${{ inputs.tag != '' && inputs.tag || github.ref_name }}'
-          $version = if ($rawTag.StartsWith('v')) { $rawTag.Substring(1) } else { $rawTag }
+          $rawTag = '${{ inputs.tag }}'
+          if (-not $rawTag) {
+            $rawTag = '${{ github.ref_name }}'
+          }
+          if ($rawTag -and ($rawTag -match '^v?[0-9]')) {
+            $version = if ($rawTag.StartsWith('v')) { $rawTag.Substring(1) } else { $rawTag }
+          } else {
+            $cargoToml = Get-Content 'native-rust/Cargo.toml' -Raw
+            if ($cargoToml -match '(?m)^version\s*=\s*"([^"]+)"') {
+              $version = $Matches[1]
+            } else {
+              $version = '0.0.11'
+            }
+          }
           Write-Host "Updating native-rust/glazebar.rc version to: $version"
           
           # Convert version like '0.0.1' or '0.1.0-preview.7' to comma-separated numbers for FILEVERSION/PRODUCTVERSION
