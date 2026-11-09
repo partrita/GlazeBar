@@ -13,6 +13,7 @@ if (!$StageOnly) {
     $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
     $expected = if ($manifest.architecture -eq 'arm64') { 'ARM64' } else { 'AMD64' }
     if ($arch -ne $expected) { throw "Use the package for your Windows architecture ($arch)." }
+    & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
     $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
     if ($running) {
         Write-Output "Stopping running GlazeWM and GlazeBar processes for update..."
@@ -20,7 +21,7 @@ if (!$StageOnly) {
             $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
             if ($running) {
                 $running | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Milliseconds 500
+                Start-Sleep -Milliseconds 400
             } else {
                 break
             }
@@ -62,6 +63,59 @@ if (Test-Path -LiteralPath $stateFile) {
     $uninstallArgs.ProfileRoot = $ProfileRoot
     & $uninstallScript @uninstallArgs
 }
+function Safe-CopyFile([string]$src, [string]$dst) {
+    New-Item -ItemType Directory -Force (Split-Path $dst) | Out-Null
+    try {
+        Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+        return
+    } catch {}
+
+    if (!$StageOnly) {
+        & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
+        Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 400
+    }
+
+    try {
+        Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+        return
+    } catch {}
+
+    try {
+        $oldDst = $dst + '.' + [Guid]::NewGuid().ToString('N') + '.old'
+        [IO.File]::Move($dst, $oldDst)
+        Remove-Item -LiteralPath $oldDst -Force -ErrorAction SilentlyContinue
+    } catch {}
+
+    Copy-Item -LiteralPath $src -Destination $dst -Force
+}
+function Safe-RemoveFile([string]$path) {
+    if (Test-Path -LiteralPath $path) {
+        try {
+            Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+            return
+        } catch {}
+
+        if (!$StageOnly) {
+            & taskkill.exe /F /T /IM glazewm.exe /IM glazewm-watcher.exe /IM GlazeBar.exe /IM GlazeTheme.exe /IM WorkspaceToggle.exe 2>$null | Out-Null
+            Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 400
+        }
+
+        try {
+            Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+            return
+        } catch {}
+
+        try {
+            $oldPath = $path + '.' + [Guid]::NewGuid().ToString('N') + '.old'
+            [IO.File]::Move($path, $oldPath)
+            Remove-Item -LiteralPath $oldPath -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Warning "Could not remove or rename: $path ($($_.Exception.Message))"
+        }
+    }
+}
 $backup = Join-Path $ProfileRoot ('.glzr\community-backups\' + [Guid]::NewGuid().ToString('N'))
 $payload = Join-Path $PSScriptRoot 'payload'
 $entries = @()
@@ -73,31 +127,16 @@ try {
         $dest = Join-Path $target $relative
         $saved = Join-Path $backup $relative
         $existed = Test-Path -LiteralPath $dest
-        if ($existed) { New-Item -ItemType Directory -Force (Split-Path $saved) | Out-Null; Copy-Item -LiteralPath $dest -Destination $saved }
+        if ($existed) { Safe-CopyFile $dest $saved }
         $entry = [ordered]@{ path = $relative; existed = $existed; sha256 = '' }
         $entries += $entry
-        New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
         if ($relative -eq 'config.yaml') {
+            New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
             $exe = (Join-Path $target 'GlazeBar.exe').Replace("'", "''")
             $text = [IO.File]::ReadAllText($file.FullName).Replace('__GLAZEBAR_EXE__', $exe)
             [IO.File]::WriteAllText($dest, $text, (New-Object Text.UTF8Encoding $false))
         } else {
-            $copied = $false
-            for ($i = 0; $i -lt 5; $i++) {
-                try {
-                    Copy-Item -LiteralPath $file.FullName -Destination $dest -Force -ErrorAction Stop
-                    $copied = $true
-                    break
-                } catch {
-                    if (!$StageOnly) {
-                        Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-                    }
-                    Start-Sleep -Milliseconds 500
-                }
-            }
-            if (!$copied) {
-                Copy-Item -LiteralPath $file.FullName -Destination $dest -Force
-            }
+            Safe-CopyFile $file.FullName $dest
         }
         $entry.sha256 = (Get-FileHash -LiteralPath $dest).Hash
     }
@@ -138,9 +177,9 @@ try {
 } catch {
     foreach ($entry in $entries) {
         $dest = Join-Path $target $entry.path
-        if ($entry.existed) { Copy-Item -LiteralPath (Join-Path $backup $entry.path) -Destination $dest -Force }
-        elseif (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Force }
+        if ($entry.existed) { Safe-CopyFile (Join-Path $backup $entry.path) $dest }
+        elseif (Test-Path -LiteralPath $dest) { Safe-RemoveFile $dest }
     }
-    if ($shortcutCreated -and (Test-Path -LiteralPath $shortcutPath)) { Remove-Item -LiteralPath $shortcutPath }
+    if ($shortcutCreated -and (Test-Path -LiteralPath $shortcutPath)) { Safe-RemoveFile $shortcutPath }
     throw
 }
