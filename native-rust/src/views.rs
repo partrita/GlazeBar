@@ -382,20 +382,27 @@ pub fn bar_with_settings(
                 );
             }
             "volume" if settings.show_volume => {
-                let (icon, text, color) = if s.muted {
-                    ("volume-x", "Mute".to_string(), ui.muted)
+                if s.muted {
+                    let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
+                    let color = if is_transparent { 0x00FFFFFF } else { ui.muted };
+                    c.icon(
+                        "volume-x",
+                        Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
+                        color,
+                    );
+                    hit(&mut hits, r, Action::VolumeMute);
+                    right = r.x - c.p(12.);
                 } else {
-                    ("volume-2", format!("{}%", s.volume), ui.text)
-                };
-                metric(
-                    c,
-                    &mut right,
-                    &mut hits,
-                    icon,
-                    &text,
-                    color,
-                    Some(Action::VolumeMute),
-                );
+                    metric(
+                        c,
+                        &mut right,
+                        &mut hits,
+                        "volume-2",
+                        &format!("{}%", s.volume),
+                        ui.text,
+                        Some(Action::VolumeMute),
+                    );
+                }
                 if s.media_playing && !s.media_title.is_empty() {
                     let display_title = if s.media_title.chars().count() > 20 {
                         format!("{}…", s.media_title.chars().take(19).collect::<String>())
@@ -406,39 +413,39 @@ pub fn bar_with_settings(
                         c,
                         &mut right,
                         &mut hits,
-                        "play",
+                        "pause",
                         &display_title,
                         ui.muted,
                         Some(Action::MediaPlayPause),
                     );
-                }
-            }
-            "caffeine" if settings.show_caffeine => {
-                let (icon, text, color) = if s.caffeine {
-                    ("coffee", "ON", ui.warning)
                 } else {
-                    ("coffee", "", ui.muted)
-                };
-                if text.is_empty() {
                     let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
+                    let color = if is_transparent { 0x00FFFFFF } else { ui.muted };
                     c.icon(
-                        icon,
+                        "play",
                         Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
                         color,
                     );
-                    hit(&mut hits, r, Action::CaffeineToggle);
+                    hit(&mut hits, r, Action::MediaPlayPause);
                     right = r.x - c.p(12.);
-                } else {
-                    metric(
-                        c,
-                        &mut right,
-                        &mut hits,
-                        icon,
-                        text,
-                        color,
-                        Some(Action::CaffeineToggle),
-                    );
                 }
+            }
+            "caffeine" if settings.show_caffeine => {
+                let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
+                let color = if s.caffeine {
+                    ui.warning
+                } else if is_transparent {
+                    0x00FFFFFF
+                } else {
+                    ui.muted
+                };
+                c.icon(
+                    "coffee",
+                    Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
+                    color,
+                );
+                hit(&mut hits, r, Action::CaffeineToggle);
+                right = r.x - c.p(12.);
             }
             "tiling" if settings.show_tiling => {
                 let r = Rect::new(right - c.p(30.), c.p(8.), c.p(30.), h - c.p(16.));

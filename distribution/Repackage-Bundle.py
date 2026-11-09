@@ -121,6 +121,12 @@ def main():
         replacement.replace(source)
     (folder / 'payload/GlazeBar.exe').write_bytes(binary)
     (folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)
+    icons_src = repo / 'icons'
+    if icons_src.exists():
+        icons_dst = folder / 'payload/icons'
+        if icons_dst.exists():
+            shutil.rmtree(icons_dst)
+        shutil.copytree(icons_src, icons_dst)
     for name in ['config.yaml', 'cheatsheet.tsv']:
         (folder / 'payload' / name).write_bytes((repo / 'distribution/templates' / name).read_bytes())
     for name in ['Install.ps1', 'Uninstall.ps1', 'README.txt', 'README.ko.txt']:
