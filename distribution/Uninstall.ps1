@@ -5,10 +5,34 @@ $ErrorActionPreference = 'Stop'
 if (!$StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -ne [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'Custom ProfileRoot is for StageOnly testing.' }
 if ($StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -eq [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'StageOnly requires an isolated ProfileRoot.' }
 if (!$StageOnly) {
-    $running = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
-    if ($running) {
-        $running | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 800
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+        if ($running) {
+            $running | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        } else {
+            break
+        }
+    }
+}
+function Safe-RemoveFile([string]$path) {
+    if (Test-Path -LiteralPath $path) {
+        $removed = $false
+        for ($i = 0; $i -lt 5; $i++) {
+            try {
+                Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+                $removed = $true
+                break
+            } catch {
+                if (!$StageOnly) {
+                    Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+                }
+                Start-Sleep -Milliseconds 500
+            }
+        }
+        if (!$removed -and (Test-Path -LiteralPath $path)) {
+            Write-Warning "Could not remove: $path ($($_.Exception.Message))"
+        }
     }
 }
 $target = [IO.Path]::GetFullPath((Join-Path $ProfileRoot '.glzr\glazewm'))
@@ -41,11 +65,11 @@ foreach ($entry in $state.entries) {
             Copy-Item -LiteralPath $backupFile -Destination $dest -Force
         }
     }
-    elseif (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Force }
+    elseif (Test-Path -LiteralPath $dest) { Safe-RemoveFile $dest }
 }
 if (!$StageOnly -and $state.startupShortcut) {
     $allowed = Join-Path ([Environment]::GetFolderPath('Startup')) 'GlazeBar Community.lnk'
-    if ($state.startupShortcut -eq $allowed -and (Test-Path -LiteralPath $allowed)) { Remove-Item -LiteralPath $allowed }
+    if ($state.startupShortcut -eq $allowed -and (Test-Path -LiteralPath $allowed)) { Safe-RemoveFile $allowed }
 }
-Remove-Item -LiteralPath $stateFile
+Safe-RemoveFile $stateFile
 Write-Output "Previous files restored. Backups and later edits retained at $backup. GlazeWM remains installed; remove it through Windows Installed apps if desired."

@@ -17,20 +17,28 @@ $log = Join-Path $logRoot ($logAction + '.log')
 try {
     if ($Action -eq 'StopProcesses') {
         if (!$TestProfile) {
-            $procs = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
-            if ($procs) {
-                $procs | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Milliseconds 800
+            for ($attempt = 0; $attempt -lt 3; $attempt++) {
+                $procs = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+                if ($procs) {
+                    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Milliseconds 500
+                } else {
+                    break
+                }
             }
         }
         exit 0
     }
     if ($Action -eq 'CheckUninstall') {
         if (!$TestProfile) {
-            $procs = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
-            if ($procs) {
-                $procs | Stop-Process -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Milliseconds 800
+            for ($attempt = 0; $attempt -lt 3; $attempt++) {
+                $procs = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+                if ($procs) {
+                    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Milliseconds 500
+                } else {
+                    break
+                }
             }
         }
         $profile = if ($TestProfile) { $TestProfile } else { $env:USERPROFILE }

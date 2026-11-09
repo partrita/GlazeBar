@@ -13,11 +13,18 @@ if (!$StageOnly) {
     $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
     $expected = if ($manifest.architecture -eq 'arm64') { 'ARM64' } else { 'AMD64' }
     if ($arch -ne $expected) { throw "Use the package for your Windows architecture ($arch)." }
-    $running = Get-Process -Name glazewm,GlazeBar,WorkspaceToggle -ErrorAction SilentlyContinue
+    $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
     if ($running) {
         Write-Output "Stopping running GlazeWM and GlazeBar processes for update..."
-        $running | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 800
+        for ($attempt = 0; $attempt -lt 3; $attempt++) {
+            $running = Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue
+            if ($running) {
+                $running | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 500
+            } else {
+                break
+            }
+        }
     }
     if (![Environment]::Is64BitProcess) { throw 'Run this installer from 64-bit PowerShell.' }
     # The official GlazeWM MSI needs VC runtime even though GlazeBar links it statically.
@@ -74,7 +81,24 @@ try {
             $exe = (Join-Path $target 'GlazeBar.exe').Replace("'", "''")
             $text = [IO.File]::ReadAllText($file.FullName).Replace('__GLAZEBAR_EXE__', $exe)
             [IO.File]::WriteAllText($dest, $text, (New-Object Text.UTF8Encoding $false))
-        } else { Copy-Item -LiteralPath $file.FullName -Destination $dest }
+        } else {
+            $copied = $false
+            for ($i = 0; $i -lt 5; $i++) {
+                try {
+                    Copy-Item -LiteralPath $file.FullName -Destination $dest -Force -ErrorAction Stop
+                    $copied = $true
+                    break
+                } catch {
+                    if (!$StageOnly) {
+                        Get-Process -Name glazewm,glazewm-watcher,GlazeBar,GlazeTheme,WorkspaceToggle -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+                    }
+                    Start-Sleep -Milliseconds 500
+                }
+            }
+            if (!$copied) {
+                Copy-Item -LiteralPath $file.FullName -Destination $dest -Force
+            }
+        }
         $entry.sha256 = (Get-FileHash -LiteralPath $dest).Hash
     }
     if ($savedUserConfig) {
