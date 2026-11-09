@@ -403,32 +403,16 @@ pub fn bar_with_settings(
                         Some(Action::VolumeMute),
                     );
                 }
-                if s.media_playing && !s.media_title.is_empty() {
-                    let display_title = if s.media_title.chars().count() > 20 {
-                        format!("{}…", s.media_title.chars().take(19).collect::<String>())
-                    } else {
-                        s.media_title.clone()
-                    };
-                    metric(
-                        c,
-                        &mut right,
-                        &mut hits,
-                        "pause",
-                        &display_title,
-                        ui.muted,
-                        Some(Action::MediaPlayPause),
-                    );
-                } else {
-                    let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
-                    let color = if is_transparent { 0x00FFFFFF } else { ui.muted };
-                    c.icon(
-                        "play",
-                        Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
-                        color,
-                    );
-                    hit(&mut hits, r, Action::MediaPlayPause);
-                    right = r.x - c.p(12.);
-                }
+                let media_icon = if s.media_playing { "pause" } else { "play" };
+                let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
+                let color = if is_transparent { 0x00FFFFFF } else { ui.muted };
+                c.icon(
+                    media_icon,
+                    Rect::new(r.x + c.p(4.), (h - c.p(16.)) / 2, c.p(16.), c.p(16.)),
+                    color,
+                );
+                hit(&mut hits, r, Action::MediaPlayPause);
+                right = r.x - c.p(12.);
             }
             "caffeine" if settings.show_caffeine => {
                 let r = Rect::new(right - c.p(24.), c.p(8.), c.p(24.), h - c.p(16.));
