@@ -66,6 +66,12 @@ Name: "autostart"; Description: "{cm:AutoStart}"; Flags: unchecked
 [CustomMessages]
 korean.AutoStart=Windows 로그인 시 GlazeBar + GlazeWM 자동 시작
 english.AutoStart=Start GlazeBar + GlazeWM when I sign in
+korean.ThemePageTitle=기본 테마 선택
+korean.ThemePageDesc=GlazeBar와 GlazeWM에 적용할 첫 컬러 테마를 선택하세요.
+korean.ThemePageSub=언제든지 GlazeBar 설정 또는 단축키(Alt+M)를 통해 테마를 변경할 수 있습니다.
+english.ThemePageTitle=Select Default Theme
+english.ThemePageDesc=Choose the initial color scheme for GlazeBar and GlazeWM.
+english.ThemePageSub=You can change themes anytime from GlazeBar settings or using shortcut (Alt+M).
 
 [Files]
 Source: "{#BundleDir}\*"; DestDir: "{app}\bundle"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -95,6 +101,7 @@ Filename: "{code:GetProfileRoot}\\.glzr\\glazewm\\wm\\glazewm.exe"; Parameters: 
 var
   StagingRoot: String;
   PayloadInstalled, SetupCompleted: Boolean;
+  ThemePage: TInputOptionWizardPage;
 
 procedure ExitProcess(ExitCode: Cardinal);
   external 'ExitProcess@kernel32.dll stdcall';
@@ -153,17 +160,52 @@ begin
   end;
 end;
 
+function GetSelectedTheme: String;
+begin
+  Result := 'tokyo-night';
+  if ThemePage <> nil then begin
+    case ThemePage.SelectedValueIndex of
+      0: Result := 'tokyo-night';
+      1: Result := 'catppuccin';
+      2: Result := 'everforest';
+      3: Result := 'rose-pine';
+      4: Result := 'monokai';
+      5: Result := 'dracula';
+    end;
+  end;
+end;
+
+procedure InitializeWizard;
+begin
+  ThemePage := CreateInputOptionPage(wpSelectTasks,
+    ExpandConstant('{cm:ThemePageTitle}'),
+    ExpandConstant('{cm:ThemePageDesc}'),
+    ExpandConstant('{cm:ThemePageSub}'),
+    True, False);
+
+  ThemePage.Add('Tokyo Night (도쿄의 밤하늘 테마, 권장)');
+  ThemePage.Add('Catppuccin Mocha (부드러운 파스텔 톤)');
+  ThemePage.Add('Everforest (편안하고 자연스러운 그린/포레스트)');
+  ThemePage.Add('Rosé Pine (우아한 소나무와 장미빛)');
+  ThemePage.Add('Monokai (선명하고 또렷한 클래식 코딩 테마)');
+  ThemePage.Add('Dracula (깊은 보라색과 네온 대비)');
+
+  ThemePage.SelectedValueIndex := 0;
+end;
+
 function RunBridgeAt(BasePath, Action: String): Boolean;
 var
   Code: Integer;
   Args: String;
 begin
-  Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+  Args := '-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' +
     BasePath + '\Setup-Bridge.ps1' + '" -Action ' + Action +
     ' -Bundle "' + BasePath + '\bundle' + '"';
-  if Action = 'Install' then
+  if Action = 'Install' then begin
     if WizardIsTaskSelected('autostart') then
       Args := Args + ' -AutoStart';
+    Args := Args + ' -Theme ' + GetSelectedTheme;
+  end;
 #if TestProfile != ""
   Args := Args + ' -TestProfile "{#TestProfile}"';
 #endif

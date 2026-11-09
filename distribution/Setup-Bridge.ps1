@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][ValidateSet('Install','Uninstall','CheckUninstall','StopProcesses')][string]$Action,
     [Parameter(Mandatory)][string]$Bundle,
     [switch]$AutoStart,
-    [string]$TestProfile
+    [string]$TestProfile,
+    [string]$Theme = ''
 )
 $ErrorActionPreference = 'Stop'
 # A parent PowerShell 7 session can export incompatible module paths.
@@ -58,6 +59,7 @@ try {
     $arguments = @{}
     if ($TestProfile) { $arguments.StageOnly = $true; $arguments.ProfileRoot = $TestProfile }
     if ($Action -eq 'Install' -and $AutoStart -and !$TestProfile) { $arguments.AutoStart = $true }
+    if ($Action -eq 'Install' -and $Theme) { $arguments.Theme = $Theme }
     & (Join-Path $Bundle ($Action + '.ps1')) @arguments *>&1 | Out-File -LiteralPath $log -Encoding UTF8
     exit 0
 } catch {

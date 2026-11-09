@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param([switch]$AutoStart, [switch]$StageOnly, [string]$ProfileRoot = $env:USERPROFILE)
+param([switch]$AutoStart, [switch]$StageOnly, [string]$ProfileRoot = $env:USERPROFILE, [string]$Theme = '')
 $ErrorActionPreference = 'Stop'
 if (!$StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -ne [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'Custom ProfileRoot is for StageOnly testing.' }
 if ($StageOnly -and [IO.Path]::GetFullPath($ProfileRoot) -eq [IO.Path]::GetFullPath($env:USERPROFILE)) { throw 'StageOnly requires an isolated ProfileRoot.' }
@@ -149,6 +149,49 @@ try {
     if ($savedThemeStateDir -and (Test-Path -LiteralPath (Join-Path $savedThemeStateDir 'theme-state'))) {
         Copy-Item -LiteralPath (Join-Path $savedThemeStateDir 'theme-state') -Destination $target -Recurse -Force
         Remove-Item -LiteralPath $savedThemeStateDir -Recurse -Force -ErrorAction SilentlyContinue
+    } elseif ($Theme) {
+        $schemes = @{
+            'tokyo-night' = @{
+                mode = 'tokyo-night'; name = 'GlazeBar Aether'
+                palette = @('#1a1b26','#f7768e','#9ece6a','#e0af68','#7aa2f7','#bb9af7','#7dcfff','#a9b1d6','#8992b8','#ff899d','#b9f27c','#ff9e64','#8db0ff','#c0caf5','#b4f9f8','#c0caf5')
+            }
+            'catppuccin' = @{
+                mode = 'catppuccin'; name = 'GlazeBar Aether'
+                palette = @('#1e1e2e','#f38ba8','#a6e3a1','#f9e2af','#89b4fa','#f5c2e7','#94e2d5','#bac2de','#9399b2','#f7aec2','#c2ecbf','#fcd682','#aeccfc','#cba6f7','#b1eae1','#cdd6f4')
+            }
+            'everforest' = @{
+                mode = 'everforest'; name = 'GlazeBar Aether'
+                palette = @('#2d353b','#e67e80','#a7c080','#dbbc7f','#7fbbb3','#d699b6','#83c092','#d3c6aa','#9da9a0','#e67e80','#a7c080','#dbbc7f','#7fbbb3','#d699b6','#83c092','#d3c6aa')
+            }
+            'rose-pine' = @{
+                mode = 'rose-pine'; name = 'GlazeBar Aether'
+                palette = @('#191724','#eb6f92','#31748f','#f6c177','#9ccfd8','#c4a7e7','#ebbcba','#e0def4','#908caa','#eb6f92','#31748f','#f6c177','#9ccfd8','#c4a7e7','#ebbcba','#e0def4')
+            }
+            'monokai' = @{
+                mode = 'monokai'; name = 'GlazeBar Aether'
+                palette = @('#272822','#f92672','#a6e22e','#f4bf75','#66d9ef','#ae81ff','#a1efe4','#f8f8f2','#9a9b94','#fd5ff0','#b6e354','#feed6c','#8cedff','#9e6ffe','#899ca1','#f9f8f5')
+            }
+            'dracula' = @{
+                mode = 'dracula'; name = 'GlazeBar Aether'
+                palette = @('#282a36','#ff5555','#50fa7b','#f1fa8c','#bd93f9','#ff79c6','#8be9fd','#f8f8f2','#92a2d4','#ff6e6e','#69ff94','#ffffa5','#d6acff','#ff92df','#a4ffff','#ffffff')
+            }
+        }
+        $selected = $schemes[$Theme.ToLower()]
+        if ($selected) {
+            $stateDir = Join-Path $target 'theme-state'
+            New-Item -ItemType Directory -Force $stateDir | Out-Null
+            $palFile = Join-Path $stateDir 'current-palette.json'
+            if (!(Test-Path -LiteralPath $palFile)) {
+                $payload = [ordered]@{
+                    image = ''
+                    light = $false
+                    mode = $selected.mode
+                    name = $selected.name
+                    palette = $selected.palette
+                }
+                $payload | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $palFile -Encoding UTF8
+            }
+        }
     }
     if (!$StageOnly) {
         $cli = Join-Path $env:ProgramFiles 'glzr.io\GlazeWM\cli\glazewm.exe'
