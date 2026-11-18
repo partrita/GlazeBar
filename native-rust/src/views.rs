@@ -523,7 +523,7 @@ pub fn bar_with_settings(
     hits
 }
 pub fn clock_formatted(idx: usize) -> String {
-    let now = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(9 * 3600).unwrap());
+    let now = chrono::Local::now();
     let day =
         ["일", "월", "화", "수", "목", "금", "토"][now.weekday().num_days_from_sunday() as usize];
     match idx {

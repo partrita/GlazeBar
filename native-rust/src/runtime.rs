@@ -1134,7 +1134,8 @@ pub fn run_with_popup(
                 Update::Error(e) => {
                     let _ = std::fs::write(root.join("rust-runtime-error.log"), e);
                 }
-                Update::Sensors(s) => {
+                Update::Sensors(mut s) => {
+                    s.caffeine = sensors.caffeine;
                     sensors = s;
                     if !sensors.wifi_available
                         && popup

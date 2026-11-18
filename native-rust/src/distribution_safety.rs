@@ -139,20 +139,20 @@ mod tests {
             "Setup-Bridge.ps1 must not use '-ExecutionPolicy Bypass'."
         );
 
-        // 4. Repackage-Bundle.py
-        let repackage_py = std::fs::read_to_string(root.join("distribution/Repackage-Bundle.py"))
-            .expect("read Repackage-Bundle.py");
+        // 4. Repackage-Bundle.ps1
+        let repackage_ps1 = std::fs::read_to_string(root.join("distribution/Repackage-Bundle.ps1"))
+            .expect("read Repackage-Bundle.ps1");
         assert!(
-            !repackage_py.contains("shutil.rmtree(upstream_dir"),
-            "Repackage-Bundle.py must NOT delete upstream_dir. Upstream MSI must remain in the bundle to prevent runtime download heuristics."
+            !repackage_ps1.contains("Remove-Item -Recurse -Force $upstreamDir"),
+            "Repackage-Bundle.ps1 must NOT delete upstreamDir. Upstream MSI must remain in the bundle to prevent runtime download heuristics."
         );
         assert!(
-            repackage_py.contains("normalize_lockfile"),
-            "Repackage-Bundle.py must normalize Cargo.lock version when comparing lockfiles."
+            repackage_ps1.contains("Normalize-Lockfile"),
+            "Repackage-Bundle.ps1 must normalize Cargo.lock version when comparing lockfiles."
         );
         assert!(
-            repackage_py.contains("(folder / 'payload/GlazeTheme.exe').unlink(missing_ok=True)"),
-            "Repackage-Bundle.py must remove the duplicate 5MB GlazeTheme.exe binary."
+            repackage_ps1.contains("payload/GlazeTheme.exe"),
+            "Repackage-Bundle.ps1 must remove the duplicate 5MB GlazeTheme.exe binary."
         );
 
         // 5. CI Release Workflow Safeguards
@@ -172,7 +172,7 @@ mod tests {
             "package-installers.yml must not package redundant duplicate GlazeTheme.exe."
         );
         assert!(
-            workflow_yml.contains("throw \"Repackage-Bundle.py failed"),
+            workflow_yml.contains("throw \"Repackage-Bundle.ps1 failed"),
             "package-installers.yml must fail immediately if repackaging step fails."
         );
     }

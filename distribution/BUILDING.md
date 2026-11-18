@@ -46,21 +46,21 @@ See [the WM notes](../docs/glazewm-modifications.md) for what the patch changes.
 ## Package each architecture
 
 Commit the source and documentation first so the source revision and the tracked
-source archive describe the release. `Repackage-Bundle.py` verifies the base bundle
+source archive describe the release. `Repackage-Bundle.ps1` verifies the base bundle
 manifest, the PE architecture of every binary, and the Cargo.lock files before it
 reuses dependency vendors, licenses and the official GlazeWM MSI from the base bundle.
 Use the previous release's verified ZIP for each architecture as the base.
 
 ```powershell
-python distribution/Repackage-Bundle.py --base <previous-x64.zip> --bar native-rust/target/x86_64-pc-windows-msvc/release/glazebar-native.exe `
-  --wm-runtime <glazewm-x64-release-folder> --wm-source <glazewm-checkout> --wm-version 3.10.1-glazebar.2 `
-  --version 0.1.0-preview.7 --output distribution/output-preview7
-python distribution/Repackage-Bundle.py --base <previous-arm64.zip> --bar native-rust/target/aarch64-pc-windows-msvc/release/glazebar-native.exe `
-  --wm-runtime <glazewm-arm64-release-folder> --wm-source <glazewm-checkout> --wm-version 3.10.1-glazebar.2 `
-  --version 0.1.0-preview.7 --output distribution/output-preview7
+./distribution/Repackage-Bundle.ps1 -Base <previous-x64.zip> -Bar native-rust/target/x86_64-pc-windows-msvc/release/glazebar-native.exe `
+  -WmRuntime <glazewm-x64-release-folder> -WmSource <glazewm-checkout> -WmVersion 3.10.1-glazebar.2 `
+  -Version 0.1.0-preview.7 -Output distribution/output-preview7
+./distribution/Repackage-Bundle.ps1 -Base <previous-arm64.zip> -Bar native-rust/target/aarch64-pc-windows-msvc/release/glazebar-native.exe `
+  -WmRuntime <glazewm-arm64-release-folder> -WmSource <glazewm-checkout> -WmVersion 3.10.1-glazebar.2 `
+  -Version 0.1.0-preview.7 -Output distribution/output-preview7
 ```
 
-The `--wm-*` options are optional. Without them the modified GlazeWM from the base
+The `-Wm*` options are optional. Without them the modified GlazeWM from the base
 bundle is kept. Each bundle includes the corresponding source and vendors in `source/`,
 and build provenance in `source/BUILD-GLAZEBAR.json`. The bundled source config uses
 `vendor/` for offline builds.

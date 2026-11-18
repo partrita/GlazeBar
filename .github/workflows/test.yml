@@ -50,8 +50,9 @@ jobs:
             ${{ runner.os }}-cargo-test-${{ matrix.target }}-
 
       - name: Verify Installer & AV Safety Safeguards
+        shell: pwsh
         run: |
-          python3 distribution/Test-InstallerSafety.py
+          ./distribution/Test-InstallerSafety.ps1
 
       - name: Run Tests
         working-directory: native-rust
