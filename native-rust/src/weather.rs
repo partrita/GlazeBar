@@ -118,17 +118,27 @@ pub fn fetch() -> Result<Weather> {
 }
 pub fn fetch_city(city_index: usize) -> Result<Weather> {
     let city = CITIES.get(city_index).copied().unwrap_or(CITIES[0]);
-    let agent = ureq::AgentBuilder::new()
-        .tls_connector(std::sync::Arc::new(native_tls::TlsConnector::new()?))
-        .timeout(Duration::from_secs(7))
+    let config = ureq::Agent::config_builder()
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .provider(ureq::tls::TlsProvider::NativeTls)
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .timeout_global(Some(Duration::from_secs(7)))
         .build();
+    let agent = ureq::Agent::new_with_config(config);
     let url = format!(
         "https://api.open-meteo.com/v1/forecast?current_weather=true&latitude={}&longitude={}&timezone={}",
         city.lat, city.lon, city.tz
     );
     let response = agent.get(&url).call()?;
     let mut bytes = vec![];
-    response.into_reader().take(65537).read_to_end(&mut bytes)?;
+    response
+        .into_body()
+        .into_reader()
+        .take(65537)
+        .read_to_end(&mut bytes)?;
     ensure!(bytes.len() <= 65536, "Weather response too large");
     parse(&bytes)
 }

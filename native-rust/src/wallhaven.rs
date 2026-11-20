@@ -2,12 +2,9 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},
-    net::{IpAddr, ToSocketAddrs},
+    net::IpAddr,
     path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 use url::Url;
@@ -218,28 +215,56 @@ fn stopped(cancel: &AtomicBool) -> Result<()> {
     ensure!(!cancel.load(Ordering::Acquire), "Cancelled");
     Ok(())
 }
-fn get(mut url: Url, timeout: Duration, cancel: &AtomicBool) -> Result<ureq::Response> {
-    let deadline = std::time::Instant::now() + timeout;
-    let agent = ureq::AgentBuilder::new()
-        .tls_connector(Arc::new(native_tls::TlsConnector::new()?))
-        .try_proxy_from_env(false)
-        .redirects(0)
-        .timeout(timeout)
-        .timeout_connect(Duration::from_secs(15))
-        .resolver(|netloc: &str| {
-            let addresses: Vec<_> = netloc
-                .to_socket_addrs()?
-                .filter(|s| public(s.ip()))
-                .collect();
-            if addresses.is_empty() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    "No public addresses",
-                ));
+#[derive(Debug, Default)]
+struct PublicResolver(ureq::unversioned::resolver::DefaultResolver);
+
+impl ureq::unversioned::resolver::Resolver for PublicResolver {
+    fn resolve(
+        &self,
+        uri: &ureq::http::Uri,
+        config: &ureq::config::Config,
+        timeout: ureq::unversioned::transport::NextTimeout,
+    ) -> std::result::Result<ureq::unversioned::resolver::ResolvedSocketAddrs, ureq::Error> {
+        let resolved = self.0.resolve(uri, config, timeout)?;
+        let mut filtered = self.empty();
+        for addr in &resolved {
+            if public(addr.ip()) {
+                filtered.push(*addr);
             }
-            Ok(addresses)
-        })
+        }
+        if filtered.is_empty() {
+            return Err(ureq::Error::Io(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "No public addresses",
+            )));
+        }
+        Ok(filtered)
+    }
+}
+
+fn get(
+    mut url: Url,
+    timeout: Duration,
+    cancel: &AtomicBool,
+) -> Result<ureq::http::Response<ureq::Body>> {
+    let deadline = std::time::Instant::now() + timeout;
+    let config = ureq::Agent::config_builder()
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .provider(ureq::tls::TlsProvider::NativeTls)
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .proxy(None)
+        .max_redirects(0)
+        .timeout_global(Some(timeout))
+        .timeout_connect(Some(Duration::from_secs(15)))
         .build();
+    let agent = ureq::Agent::with_parts(
+        config,
+        ureq::unversioned::transport::DefaultConnector::default(),
+        PublicResolver::default(),
+    );
     for redirect in 0..5 {
         stopped(cancel)?;
         validate_url(&url, None)?;
@@ -247,28 +272,28 @@ fn get(mut url: Url, timeout: Duration, cancel: &AtomicBool) -> Result<ureq::Res
         ensure!(!remaining.is_zero(), "Wallhaven request timed out");
         let response = match agent
             .get(url.as_str())
-            .timeout(remaining)
-            .set("User-Agent", "GlazeBar/1.0 wallpaper selector")
+            .header("User-Agent", "GlazeBar/1.0 wallpaper selector")
+            .config()
+            .timeout_global(Some(remaining))
+            .build()
             .call()
         {
             Ok(r) => r,
-            Err(ureq::Error::Status(status, _)) => bail!("Wallhaven HTTP {status}"),
+            Err(ureq::Error::StatusCode(status)) => bail!("Wallhaven HTTP {status}"),
             Err(e) => return Err(e.into()),
         };
-        if [301, 302, 303, 307, 308].contains(&response.status()) {
+        let status = response.status().as_u16();
+        if [301, 302, 303, 307, 308].contains(&status) {
             ensure!(redirect < 4, "Too many redirects");
-            url = url.join(
-                response
-                    .header("Location")
-                    .context("Redirect has no location")?,
-            )?;
+            let location = response
+                .headers()
+                .get("Location")
+                .and_then(|v| v.to_str().ok())
+                .context("Redirect has no location")?;
+            url = url.join(location)?;
             continue;
         }
-        ensure!(
-            response.status() == 200,
-            "Wallhaven HTTP {}",
-            response.status()
-        );
+        ensure!(status == 200, "Wallhaven HTTP {status}");
         return Ok(response);
     }
     unreachable!()
@@ -297,7 +322,12 @@ fn json(url: Url, cancel: &AtomicBool) -> Result<Vec<u8>> {
     validate_url(&url, Some("wallhaven.cc"))?;
     let response = get(url, Duration::from_secs(20), cancel)?;
     let mut bytes = Vec::new();
-    bounded(response.into_reader(), &mut bytes, 2 << 20, cancel)?;
+    bounded(
+        response.into_body().into_reader(),
+        &mut bytes,
+        2 << 20,
+        cancel,
+    )?;
     Ok(bytes)
 }
 #[cfg(test)]
@@ -493,7 +523,9 @@ pub fn download(id: &str, folder: &Path, cancel: &AtomicBool) -> Result<PathBuf>
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             let response = get(url, Duration::from_secs(60), cancel)?;
             if let Some(length) = response
-                .header("Content-Length")
+                .headers()
+                .get("Content-Length")
+                .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok())
             {
                 ensure!(length <= MAX_IMAGE_BYTES, "Download exceeds size limit");
@@ -503,7 +535,7 @@ pub fn download(id: &str, folder: &Path, cancel: &AtomicBool) -> Result<PathBuf>
                 .prefix(".part-")
                 .tempfile_in(&folder)?;
             bounded(
-                response.into_reader(),
+                response.into_body().into_reader(),
                 temp.as_file_mut(),
                 MAX_IMAGE_BYTES,
                 cancel,
@@ -532,7 +564,12 @@ pub fn thumbnail(url: &str, cancel: &AtomicBool) -> Result<image::RgbaImage> {
         |url, cancel| {
             let response = get(url.clone(), Duration::from_secs(8), cancel)?;
             let mut bytes = vec![];
-            bounded(response.into_reader(), &mut bytes, 4 << 20, cancel)?;
+            bounded(
+                response.into_body().into_reader(),
+                &mut bytes,
+                4 << 20,
+                cancel,
+            )?;
             Ok(bytes)
         },
     )
